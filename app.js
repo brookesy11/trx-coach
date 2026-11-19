@@ -171,7 +171,8 @@
     // Under a minute show just the seconds, so the digits can be huge from across the room.
     var ct = st.left < 60 ? String(st.left) : fmt(st.left), ce = $("clock");
     ce.textContent = ct; ce.classList.toggle("long", ct.length > 2);
-    if ($("name").textContent !== s.name) { $("name").textContent = s.name; fitName(); }
+    var dname = s.name.replace(/-/g, "\u2011"); // non-breaking hyphen: never split "push-up"
+    if ($("name").textContent !== dname) { $("name").textContent = dname; fitName(); }
     var nx = s.kind === "rest" ? nextWork(st.idx) : S[st.idx + 1];
     if (nx && nx.kind === "rest") nx = nextWork(st.idx);
     var curName = s.kind === "rest" ? null : s.name;
@@ -188,8 +189,9 @@
     var chips = $("chips").children;
     for (var c = 0; c < chips.length; c++) {
       var ch = chips[c], ex = +ch.dataset.ex, all = true;
-      var ticks = ch.querySelectorAll("i"), k = 0;
-      S.forEach(function (x, xi) { if (x.kind !== "rest" && x.ex === ex) { ticks[k].className = st.done[xi] ? "on" : ""; if (!st.done[xi]) all = false; k++; } });
+      var tot = 0, dn = 0;
+      S.forEach(function (x, xi) { if (x.kind !== "rest" && x.ex === ex) { tot++; if (st.done[xi]) dn++; else all = false; } });
+      ch.querySelector(".pfill").style.width = (tot ? dn / tot * 100 : 0) + "%";
       ch.className = "chip" + (ex === curEx ? " cur" : "") + (all ? " done" : "");
     }
     if (!$("howto").hidden) $("hClock").textContent = (s.kind === "rest" ? "Rest " : "") + fmt(st.left);
@@ -216,10 +218,9 @@
     var nav = $("chips"); nav.innerHTML = "";
     var groups = [{ ex: -1, n: "W", label: "Warm-up" }].concat(plan.moves.map(function (m, i) { return { ex: i, n: String(i + 1), label: m }; }));
     groups.forEach(function (g) {
-      var count = S.filter(function (x) { return x.kind !== "rest" && x.ex === g.ex; }).length;
       var b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.dataset.ex = g.ex;
       b.setAttribute("aria-label", g.label);
-      b.innerHTML = '<span class="n"></span><span class="ticks">' + new Array(count + 1).join("<i></i>") + "</span>";
+      b.innerHTML = '<span class="n"></span><span class="pbar"><span class="pfill"></span></span>';
       b.querySelector(".n").textContent = g.n;
       b.addEventListener("click", function () { jumpToEx(g.ex); });
       nav.appendChild(b);
@@ -263,8 +264,6 @@
 
   // ---- Controls ----
   function toggle() { running ? pause() : play(); }
-  function hideHint() { if (!$("hint").hidden) { $("hint").hidden = true; } save("trx:hinted", true); }
-  if (!load("trx:hinted", false)) $("hint").hidden = false;
 
   var inner = $("stageInner"), animating = false;
   function slide(dir, change) { // dir -1 = content leaves to the left (next), +1 = to the right (back)
@@ -313,7 +312,7 @@
     if (!tracking) return; tracking = false;
     var t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
     if (horiz && Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      lastSwipe = Date.now(); hideHint();
+      lastSwipe = Date.now();
       if (dx < 0) next(); else back();
     } else snapBack();
   }
