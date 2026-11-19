@@ -16,32 +16,30 @@
 </head>
 <body>
 <main id="app">
-  <div class="meta"><span id="focus">Workout</span></div>
-  <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
+  <div class="topRow">
+    <span id="focus" class="focus">Workout</span>
+    <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
+    <button id="playBtn" class="play" type="button" aria-label="Start">
+      <svg class="icoPlay" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>
+      <svg class="icoPause" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4.5" width="4.5" height="15" rx="1" fill="currentColor"/><rect x="14" y="4.5" width="4.5" height="15" rx="1" fill="currentColor"/></svg>
+    </button>
+  </div>
 
-  <section class="stage" aria-live="polite">
-    <div id="clock" class="clock">0:30</div>
-    <div class="nameRow">
-      <h1 id="name">Loading</h1>
-      <button id="infoBtn" class="info" type="button" aria-label="How to do this exercise">?</button>
+  <section id="stage" class="stage" aria-live="polite">
+    <div id="stageInner" class="stageInner">
+      <div id="clock" class="clock" role="button" aria-label="Tap to start or pause">0:30</div>
+      <div class="nameRow">
+        <h1 id="name" class="name">Loading</h1>
+        <button id="infoBtn" class="info" type="button" aria-label="How to do this exercise">?</button>
+      </div>
+      <p class="next"><span>Next</span> <b id="next">-</b></p>
+      <button id="plusBtn" class="plus" type="button" hidden>+15s</button>
     </div>
-    <p class="next"><span>Next</span> <b id="next">-</b></p>
   </section>
 
-  <div class="primary">
-    <button id="startBtn" class="btn solid">Start</button>
-    <button id="completeBtn" class="btn outline">Complete</button>
-  </div>
-  <div class="secondary">
-    <button id="backBtn" class="btn small" aria-label="Back">Back</button>
-    <button id="plusBtn" class="btn small" aria-label="Add 15 seconds">+15s</button>
-    <button id="skipBtn" class="btn small" aria-label="Skip">Skip</button>
-    <button id="resetBtn" class="btn small" aria-label="Reset">Reset</button>
-  </div>
+  <p id="hint" class="hint" hidden>Swipe &larr; next &middot; &rarr; back &middot; tap timer to pause</p>
   <p id="wake" class="wake" hidden></p>
-
   <nav id="chips" class="chips" aria-label="Today's exercises"></nav>
-  <p id="chipName" class="chipName"></p>
 </main>
 
 <div id="howto" class="modal" hidden>
@@ -66,7 +64,8 @@
     <p class="finishStat" id="finishStat"></p>
     <p class="finishStreak" id="finishStreak"></p>
     <p class="finishTomorrow" id="finishTomorrow"></p>
-    <button id="againBtn" class="btn outline wide">Do it again</button>
+    <button id="againBtn" class="again" type="button">Again</button>
+    <p class="finishHint">Swipe &rarr; to go back</p>
   </div>
 </section>
 

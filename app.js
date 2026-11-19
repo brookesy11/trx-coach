@@ -168,16 +168,21 @@
     var nr = nonRest(), doneCount = nr.filter(function (i) { return st.done[i]; }).length;
     var elapsed = 0; for (var i = 0; i < st.idx; i++) elapsed += S[i].secs; elapsed += s.secs - st.left;
     $("barFill").style.width = (st.finished ? 100 : Math.min(100, elapsed / plan.total * 100)) + "%";
-    $("clock").textContent = fmt(st.left);
-    $("name").textContent = s.name;
+    // Under a minute show just the seconds, so the digits can be huge from across the room.
+    var ct = st.left < 60 ? String(st.left) : fmt(st.left), ce = $("clock");
+    ce.textContent = ct; ce.classList.toggle("long", ct.length > 2);
+    if ($("name").textContent !== s.name) { $("name").textContent = s.name; fitName(); }
     var nx = s.kind === "rest" ? nextWork(st.idx) : S[st.idx + 1];
     if (nx && nx.kind === "rest") nx = nextWork(st.idx);
     var curName = s.kind === "rest" ? null : s.name;
     $("next").textContent = !nx ? "Finish" : (nx.kind === "work" && (nx.name === curName || (s.kind === "rest" && nx.set > 1)) ? "Set " + nx.set : nx.name);
-    document.querySelector(".stage").classList.toggle("rest", s.kind === "rest");
-    var sb = $("startBtn");
-    sb.textContent = running ? "Pause" : (st.idx > 0 || st.left < s.secs ? "Resume" : "Start");
-    sb.className = "btn " + (running ? "outline" : "solid");
+    var stage = $("stage");
+    stage.classList.toggle("rest", s.kind === "rest");
+    stage.classList.toggle("paused", !running);
+    $("plusBtn").hidden = s.kind !== "rest";
+    var pb = $("playBtn");
+    pb.className = "play" + (running ? " on" : " idle");
+    pb.setAttribute("aria-label", running ? "Pause" : (st.idx > 0 || st.left < s.secs ? "Resume" : "Start"));
     // chips
     var curEx = s.ex;
     var chips = $("chips").children;
@@ -187,7 +192,6 @@
       S.forEach(function (x, xi) { if (x.kind !== "rest" && x.ex === ex) { ticks[k].className = st.done[xi] ? "on" : ""; if (!st.done[xi]) all = false; k++; } });
       ch.className = "chip" + (ex === curEx ? " cur" : "") + (all ? " done" : "");
     }
-    $("chipName").textContent = curEx < 0 ? "Warm-up" : (curEx + 1) + ". " + plan.moves[curEx];
     if (!$("howto").hidden) $("hClock").textContent = (s.kind === "rest" ? "Rest " : "") + fmt(st.left);
     // finish
     var fin = $("finish");
@@ -242,14 +246,90 @@
   $("howto").addEventListener("click", function (e) { if (e.target === $("howto")) closeHowto(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeHowto(); });
 
-  // ---- Buttons ----
-  $("startBtn").addEventListener("click", function () { running ? pause() : play(); });
-  $("completeBtn").addEventListener("click", function () { unlockAudio(); goTo(st.idx + 1, true); });
-  $("backBtn").addEventListener("click", function () { goTo(st.idx - 1, false); });
-  $("skipBtn").addEventListener("click", function () { goTo(st.idx + 1, false); });
+  // ---- Name auto-fit: as large as possible, max 2 lines ----
+  function fitName() {
+    var el = $("name");
+    var max = Math.min(window.innerWidth * 0.15, window.innerHeight * 0.08, 84), size = Math.round(max);
+    el.style.fontSize = size + "px";
+    while (size > 22 && (el.scrollHeight > size * 1.05 * 2 + 4 || el.scrollWidth > el.clientWidth + 1)) {
+      size -= 2; el.style.fontSize = size + "px";
+    }
+  }
+  window.addEventListener("resize", fitName);
+
+  // ---- Controls ----
+  function toggle() { running ? pause() : play(); }
+  function hideHint() { if (!$("hint").hidden) { $("hint").hidden = true; } save("trx:hinted", true); }
+  if (!load("trx:hinted", false)) $("hint").hidden = false;
+
+  var inner = $("stageInner"), animating = false;
+  function slide(dir, change) { // dir -1 = content leaves to the left (next), +1 = to the right (back)
+    var w = Math.min(window.innerWidth, 600) * 0.35;
+    inner.classList.remove("dragging");
+    inner.style.transform = "translateX(" + (dir * w) + "px)"; inner.style.opacity = "0";
+    animating = true;
+    setTimeout(function () {
+      change();
+      inner.classList.add("dragging");
+      inner.style.transform = "translateX(" + (-dir * w) + "px)";
+      void inner.offsetWidth;
+      inner.classList.remove("dragging");
+      inner.style.transform = ""; inner.style.opacity = "";
+      animating = false;
+    }, 140);
+  }
+  function snapBack() { inner.classList.remove("dragging"); inner.style.transform = ""; inner.style.opacity = ""; }
+  function next() {
+    if (st.finished) return;
+    unlockAudio();
+    slide(-1, function () { goTo(st.idx + 1, true); });
+  }
+  function back() {
+    if (st.finished) { st.finished = false; persist(); render(); return; }
+    if (st.idx === 0) { snapBack(); return; }
+    slide(1, function () { goTo(st.idx - 1, false); });
+  }
+
+  // Swipe: >= 50px horizontal and clearly more horizontal than vertical.
+  var tx = 0, ty = 0, tracking = false, horiz = false, lastSwipe = 0;
+  function onStart(e) {
+    if (!$("howto").hidden || e.touches.length > 1 || animating) { tracking = false; return; }
+    tracking = true; horiz = false; tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+  }
+  function onMove(e) {
+    if (!tracking) return;
+    var dx = e.touches[0].clientX - tx, dy = e.touches[0].clientY - ty;
+    if (!horiz && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) horiz = true;
+    if (horiz) {
+      e.preventDefault(); // keep the browser from treating it as navigation/scroll
+      if (!st.finished) { inner.classList.add("dragging"); inner.style.transform = "translateX(" + (dx * 0.6) + "px)"; inner.style.opacity = String(Math.max(0.3, 1 - Math.abs(dx) / 400)); }
+    }
+  }
+  function onEnd(e) {
+    if (!tracking) return; tracking = false;
+    var t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
+    if (horiz && Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      lastSwipe = Date.now(); hideHint();
+      if (dx < 0) next(); else back();
+    } else snapBack();
+  }
+  [document.getElementById("app"), $("finish")].forEach(function (el) {
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", function () { tracking = false; snapBack(); }, { passive: true });
+  });
+
+  $("playBtn").addEventListener("click", toggle);
+  $("clock").addEventListener("click", function () { if (Date.now() - lastSwipe > 400) toggle(); });
   $("plusBtn").addEventListener("click", function () { st.left += 15; if (running) endAt += 15000; persist(); render(); });
-  $("resetBtn").addEventListener("click", function () { if (confirm("Reset today's workout?")) reset(); });
   $("againBtn").addEventListener("click", reset);
+  document.addEventListener("keydown", function (e) {
+    if (!$("howto").hidden) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); next(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); back(); }
+    else if (e.key === " ") { e.preventDefault(); toggle(); }
+  });
 
   // ---- Lifecycle ----
   document.addEventListener("visibilitychange", function () {
