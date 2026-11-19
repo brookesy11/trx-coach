@@ -13,7 +13,13 @@
   function saveOv(k, ov) { save("trx:ov:" + k, ov); }
 
   // ---- Completion ping (ntfy.sh): once per date, queued until a POST succeeds ----
-  var PING_URL = "https://ntfy.sh/trx-coach-87kmzuy2zuo8bfk17k54g3g5";
+  // The topic is never in the code: it is paired on the device (long-press the day label, or #pair=<code>).
+  var TOPIC_RE = /^[A-Za-z0-9_-]{16,64}$/;
+  function pingTopic() { var t = load("trx:ntfyTopic", ""); return TOPIC_RE.test(t) ? t : ""; }
+  (function readPairHash() {
+    var m = /[#&]pair=([A-Za-z0-9_-]{16,64})/.exec(location.hash || "");
+    if (m) { save("trx:ntfyTopic", m[1]); try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} }
+  })();
   function queuePing(dateKey, body) {
     if (load("trx:pinged:" + dateKey, false)) return;
     save("trx:pinged:" + dateKey, true);
@@ -22,12 +28,13 @@
   }
   var flushing = false;
   function flushPings() {
-    if (flushing || !window.fetch) return;
+    var topic = pingTopic();
+    if (flushing || !window.fetch || !topic) return; // not paired yet: keep it queued
     var q = load("trx:pingq", []);
     if (!q.length) return;
     flushing = true;
     var body = q[0];
-    fetch(PING_URL, { method: "POST", body: body, keepalive: true }).then(function (r) {
+    fetch("https://ntfy.sh/" + topic, { method: "POST", body: body, keepalive: true }).then(function (r) {
       flushing = false;
       if (!r.ok) return;
       var cur = load("trx:pingq", []); if (cur[0] === body) cur.shift(); save("trx:pingq", cur);
@@ -113,7 +120,10 @@
 
   // ---- Deferred reload for app updates ----
   var pendingReload = false;
-  function maybeReload() { if (pendingReload && !running) { persist(); window.location.reload(); } }
+  function maybeReload() {
+    var tRun = window.TRXTimer && window.TRXTimer.isRunning();
+    if (pendingReload && !running && !tRun) { persist(); window.location.reload(); }
+  }
 
   // ---- Timer ----
   var running = false, timer = null, endAt = 0;
@@ -196,8 +206,18 @@
     return h ? h + ":" + p(m) + ":" + p(s) : m + ":" + p(s);
   }
   function tomorrowKey() { var d = T.parseKey(todayKey); d.setDate(d.getDate() + 1); return T.dateKey(d); }
+  // Swaps stay pending until Save.
+  var pendingOv = null;
+  function ovEqual(a, b) { return JSON.stringify(a || {}) === JSON.stringify(b || {}); }
+  function renderSave(justSaved) {
+    var b = $("saveBtn"), dirty = pendingOv && !ovEqual(pendingOv, loadOv(tomorrowKey()));
+    if (justSaved) { b.hidden = false; b.textContent = "Saved \u2713"; b.classList.add("saved"); setTimeout(function () { if (!pendingOv || ovEqual(pendingOv, loadOv(tomorrowKey()))) b.hidden = true; }, 1600); return; }
+    b.textContent = "Save"; b.classList.remove("saved"); b.hidden = !dirty;
+  }
   function renderTomorrow() {
-    var k = tomorrowKey(), tp = T.planFor(k, loadOv(k));
+    var k = tomorrowKey();
+    if (!pendingOv) pendingOv = JSON.parse(JSON.stringify(loadOv(k) || {}));
+    var tp = T.planFor(k, pendingOv);
     $("tmrHead").textContent = "Tomorrow \u00b7 " + tp.focus;
     var ol = $("tmrList"); ol.innerHTML = "";
     tp.moves.forEach(function (name, slot) {
@@ -209,16 +229,18 @@
       sb.addEventListener("click", function () { swapTomorrow(slot); });
       li.appendChild(nb); li.appendChild(sb); ol.appendChild(li);
     });
+    renderSave();
   }
   function swapTomorrow(slot) {
-    var k = tomorrowKey(), ov = loadOv(k) || {}, tp = T.planFor(k, ov);
+    var k = tomorrowKey(); if (!pendingOv) pendingOv = JSON.parse(JSON.stringify(loadOv(k) || {}));
+    var tp = T.planFor(k, pendingOv);
     var opts = T.swapOptions(k, slot, tp.moves);
     if (!opts.length) return;
-    ov[slot] = opts[Math.floor(Math.random() * opts.length)];
-    saveOv(k, ov);
+    pendingOv[slot] = opts[Math.floor(Math.random() * opts.length)];
     renderTomorrow();
     var b = $("tmrList").children[slot].querySelector(".tmrSwap"); b.classList.add("spin");
   }
+  function saveTomorrow() { saveOv(tomorrowKey(), JSON.parse(JSON.stringify(pendingOv || {}))); renderSave(true); }
   function fmtDate(k) { return T.parseKey(k).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }); }
   function nonRest() { var a = []; S.forEach(function (s, i) { if (s.kind !== "rest") a.push(i); }); return a; }
 
@@ -379,10 +401,13 @@
     var t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
     if (horiz && Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       lastSwipe = Date.now();
+      var TT = window.TRXTimer;
+      if (TT && TT.isOpen()) { if (dx > 0) TT.close(); return; }
+      if (st.finished && dx < 0) { if (TT) TT.open(); return; }
       if (dx < 0) next(); else back();
     } else snapBack();
   }
-  [document.getElementById("app"), $("finish")].forEach(function (el) {
+  [document.getElementById("app"), $("finish"), $("timerPage")].forEach(function (el) {
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchmove", onMove, { passive: false });
     el.addEventListener("touchend", onEnd, { passive: true });
@@ -392,9 +417,14 @@
   $("playBtn").addEventListener("click", toggle);
   $("clock").addEventListener("click", function () { if (Date.now() - lastSwipe > 400) toggle(); });
   $("plusBtn").addEventListener("click", function () { st.left += 15; if (running) endAt += 15000; persist(); render(); });
-  $("againBtn").addEventListener("click", reset);
+  $("againBtn").addEventListener("click", function () { pendingOv = null; reset(); });
+  $("saveBtn").addEventListener("click", saveTomorrow);
+  $("timerCue").addEventListener("click", function () { if (window.TRXTimer) window.TRXTimer.open(); });
   document.addEventListener("keydown", function (e) {
     if (!$("howto").hidden) return;
+    var TT = window.TRXTimer;
+    if (TT && TT.isOpen()) { if (e.key === "ArrowLeft") { e.preventDefault(); TT.close(); } return; }
+    if (st.finished && e.key === "ArrowRight") { e.preventDefault(); if (TT) TT.open(); return; }
     if (e.key === "ArrowRight") { e.preventDefault(); next(); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); back(); }
     else if (e.key === " ") { e.preventDefault(); toggle(); }
@@ -403,8 +433,9 @@
   // ---- Lifecycle ----
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") {
-      if (running && !wakeLock && wakeMode !== "video") acquireWake();
-      if (running && wakeMode === "video") { try { video.play(); } catch (e) {} }
+      var awake = running || (window.TRXTimer && window.TRXTimer.isRunning());
+      if (awake && !wakeLock && wakeMode !== "video") acquireWake();
+      if (awake && wakeMode === "video") { try { video.play(); } catch (e) {} }
       if (!running && T.dateKey(new Date()) !== todayKey) initDay();
       else tick();
     } else {
@@ -414,6 +445,33 @@
   });
   window.addEventListener("pagehide", persist);
 
+  // ---- Hidden pairing: long-press the day label (main or finish screen) ----
+  function openPair() {
+    $("pairInput").value = "";
+    $("pairMsg").textContent = pingTopic() ? "Paired" : "Not paired";
+    $("pair").hidden = false; pairOpenedAt = Date.now();
+  }
+  var pairOpenedAt = 0;
+  function closePair() { $("pair").hidden = true; }
+  function doPair() {
+    var v = ($("pairInput").value || "").trim().replace(/^.*pair=/, "");
+    if (!TOPIC_RE.test(v)) { $("pairMsg").textContent = "That code doesn't look right"; return; }
+    save("trx:ntfyTopic", v); $("pairMsg").textContent = "Paired \u2713"; flushPings();
+    setTimeout(closePair, 900);
+  }
+  function longPress(el, fn) {
+    var t = null, fired = false;
+    function clear() { if (t) { clearTimeout(t); t = null; } }
+    el.addEventListener("touchstart", function () { clear(); fired = false; t = setTimeout(function () { t = null; fired = true; fn(); }, 800); }, { passive: true });
+    el.addEventListener("touchend", function (e) { clear(); if (fired && e.cancelable) e.preventDefault(); }); el.addEventListener("touchmove", clear, { passive: true }); el.addEventListener("touchcancel", clear);
+    el.addEventListener("contextmenu", function (e) { e.preventDefault(); fn(); });
+  }
+  longPress($("focus"), openPair); longPress($("finishFocus"), openPair);
+  $("pairGo").addEventListener("click", doPair);
+  $("pairClose").addEventListener("click", closePair);
+  $("pair").addEventListener("click", function (e) { if (e.target === $("pair") && Date.now() - pairOpenedAt > 600) closePair(); });
+
+  window.TRXAPP = { beep: beep, unlockAudio: unlockAudio, acquireWake: acquireWake, releaseWake: releaseWake, maybeReload: maybeReload };
   initDay();
 
   if ("serviceWorker" in navigator) {

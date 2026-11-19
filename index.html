@@ -43,6 +43,38 @@
   <nav id="chips" class="chips" aria-label="Today's exercises"></nav>
 </main>
 
+<section id="timerPage" class="timerPage" hidden>
+  <div id="tMenu" class="tMenu">
+    <div class="tTop"><button id="tBack" class="tIcon" type="button" aria-label="Back">&lsaquo;</button><span class="tTitle">Timer</span><span class="tIconSpacer"></span></div>
+    <div class="tGrid" id="tGrid">
+      <button class="tPre" data-p="cd30">30s</button><button class="tPre" data-p="cd60">1m</button><button class="tPre" data-p="cd120">2m</button>
+      <button class="tPre" data-p="cd300">5m</button><button class="tPre" data-p="cd480">8m</button><button class="tPre" data-p="cdx">Custom</button>
+      <button class="tPre" data-p="tabata">Tabata</button><button class="tPre" data-p="emom">EMOM</button><button class="tPre" data-p="intv">Intervals</button>
+      <button class="tPre wide" data-p="sw">Stopwatch</button>
+    </div>
+    <div id="tEdit" class="tEdit" hidden>
+      <div id="tFields"></div>
+      <button id="tGo" class="tGo" type="button">Start</button>
+    </div>
+  </div>
+  <div id="tRun" class="tRun" hidden>
+    <div class="tTop"><button id="tStop" class="tIcon" type="button" aria-label="Stop">&times;</button><span id="tRound" class="tRound"></span><span class="tIconSpacer"></span></div>
+    <div class="tStage">
+      <div id="tState" class="tState">Ready</div>
+      <div id="tTime" class="tTime" role="button" aria-label="Tap to start or pause">0</div>
+      <div id="tHint" class="tHint"></div>
+    </div>
+  </div>
+</section>
+
+<div id="pair" class="modal" hidden>
+  <div class="sheet pairSheet" role="dialog" aria-modal="true" aria-label="Pair">
+    <div class="sheetTop"><span id="pairMsg" class="hClock"></span><button id="pairClose" class="x" type="button" aria-label="Close">&times;</button></div>
+    <input id="pairInput" class="pairInput" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Pairing code">
+    <button id="pairGo" class="tGo" type="button">Pair</button>
+  </div>
+</div>
+
 <div id="howto" class="modal" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hName">
     <div class="sheetTop">
@@ -67,8 +99,13 @@
       <p class="tmrHead" id="tmrHead">Tomorrow</p>
       <ol class="tmrList" id="tmrList"></ol>
     </div>
+    <button id="saveBtn" class="saveBtn" type="button" hidden>Save</button>
     <button id="againBtn" class="again" type="button">Again</button>
   </div>
+  <button id="timerCue" class="timerCue" type="button" aria-label="Open timer">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 13.5V9.5M9.5 3h5M12 3v3M18.2 6.8l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    <span aria-hidden="true">&rsaquo;</span>
+  </button>
 </section>
 
 <video id="nosleep" playsinline muted loop preload="auto" aria-hidden="true" tabindex="-1">
@@ -77,6 +114,7 @@
 
 <script src="workouts.js"></script>
 <script src="howto.js"></script>
+<script src="timer.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

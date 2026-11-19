@@ -96,3 +96,47 @@ body {
 .hSteps li { margin: 0 0 6px; }
 .hRow { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-size: 16px; line-height: 1.4; margin: 0; padding: 10px 0; border-top: 1px solid #333; }
 .hRow b { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
+
+/* Finish: save + timer cue */
+.saveBtn { display: block; margin: 16px auto 0; min-width: 160px; min-height: 52px; padding: 0 28px; border-radius: 26px; border: 3px solid var(--fg);
+  background: var(--fg); color: var(--bg); font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+.saveBtn.saved { background: var(--bg); color: var(--fg); }
+.saveBtn[hidden] { display: none; }
+.timerCue { position: absolute; right: calc(var(--sar) + 12px); bottom: calc(var(--sab) + 12px); display: flex; flex-direction: row; align-items: center; gap: 4px;
+  background: none; border: 0; color: #8a8a8a; padding: 12px 6px; cursor: pointer; touch-action: manipulation; }
+.timerCue svg { width: 24px; height: 24px; }
+.timerCue span { font-size: 30px; line-height: 1; font-weight: 700; margin-top: -3px; }
+
+/* Timer page */
+.timerPage { position: fixed; inset: 0; z-index: 15; background: var(--bg); color: var(--fg); touch-action: pan-y; display: flex; flex-direction: column;
+  padding: calc(var(--sat) + 10px) calc(var(--sar) + 16px) calc(var(--sab) + 16px) calc(var(--sal) + 16px); }
+.timerPage[hidden], .tMenu[hidden], .tRun[hidden], .tEdit[hidden] { display: none; }
+.tMenu, .tRun { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.tTop { display: flex; align-items: center; justify-content: space-between; min-height: 48px; }
+.tTitle, .tRound { font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+.tRound { color: var(--dim); }
+.tIcon { width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--fg); background: var(--bg); color: var(--fg); font-size: 28px; line-height: 1; padding: 0 0 3px; cursor: pointer; touch-action: manipulation; }
+.tIconSpacer { width: 48px; }
+.tGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 3vh; }
+.tPre { min-height: min(13vh, 92px); border: 2px solid #6a6a6a; border-radius: 18px; background: var(--bg); color: var(--fg); font: inherit;
+  font-size: clamp(19px, 5.6vw, 26px); font-weight: 800; cursor: pointer; touch-action: manipulation; padding: 0 4px; }
+.tPre.wide { grid-column: 1 / -1; }
+.tPre.last { border: 3px solid var(--fg); }
+.tPre.sel { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.tEdit { margin-top: 3vh; }
+.tField { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
+.tField label { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); width: 74px; }
+.tField .v { flex: 1; text-align: center; font-size: clamp(30px, 10vw, 44px); font-weight: 800; font-variant-numeric: tabular-nums; }
+.tStep { width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--fg); background: var(--bg); color: var(--fg); font-size: 30px; font-weight: 700; line-height: 1; cursor: pointer; touch-action: manipulation; padding: 0 0 3px; }
+.tGo { display: block; width: 100%; margin-top: 14px; min-height: 62px; border-radius: 31px; border: 0; background: var(--fg); color: var(--bg); font: inherit; font-size: 24px; font-weight: 800; cursor: pointer; }
+.tStage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.tState { font-size: clamp(30px, 10vw, 52px); font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.tTime { font-size: min(72vw, 40vh, 420px); line-height: .95; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; cursor: pointer; }
+.tTime.long { font-size: min(38vw, 30vh, 260px); }
+.tHint { font-size: 16px; color: var(--dim); min-height: 1.3em; margin-top: 1vh; }
+.tRun.rest .tTime, .tRun.rest .tState, .tRun.ready .tTime, .tRun.ready .tState { color: #6f6f6f; }
+.tRun.paused .tTime { opacity: .5; }
+.pairInput { width: 100%; margin-top: 10px; min-height: 58px; border-radius: 14px; border: 2px solid var(--fg); background: var(--bg); color: var(--fg);
+  font: inherit; font-size: 18px; padding: 0 14px; -webkit-user-select: text; user-select: text; }
+#pair { z-index: 30; align-items: center; }
+.pairSheet { border: 2px solid var(--fg); border-radius: 22px; margin: 0 16px; }
