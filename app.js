@@ -228,6 +228,15 @@
   initDay();
 
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {}); });
+    var hadController = !!navigator.serviceWorker.controller, reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (hadController && !reloaded) { reloaded = true; window.location.reload(); }
+    });
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js", { scope: "./", updateViaCache: "none" }).then(function (reg) {
+        reg.update();
+        document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") reg.update(); });
+      }).catch(function () {});
+    });
   }
 })();
