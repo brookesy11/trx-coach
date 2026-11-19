@@ -12,6 +12,31 @@
   function loadOv(k) { return load("trx:ov:" + k, null); }
   function saveOv(k, ov) { save("trx:ov:" + k, ov); }
 
+  // ---- Completion ping (ntfy.sh): once per date, queued until a POST succeeds ----
+  var PING_URL = "https://ntfy.sh/trx-coach-87kmzuy2zuo8bfk17k54g3g5";
+  function queuePing(dateKey, body) {
+    if (load("trx:pinged:" + dateKey, false)) return;
+    save("trx:pinged:" + dateKey, true);
+    var q = load("trx:pingq", []); q.push(body); save("trx:pingq", q);
+    flushPings();
+  }
+  var flushing = false;
+  function flushPings() {
+    if (flushing || !window.fetch) return;
+    var q = load("trx:pingq", []);
+    if (!q.length) return;
+    flushing = true;
+    var body = q[0];
+    fetch(PING_URL, { method: "POST", body: body, keepalive: true }).then(function (r) {
+      flushing = false;
+      if (!r.ok) return;
+      var cur = load("trx:pingq", []); if (cur[0] === body) cur.shift(); save("trx:pingq", cur);
+      if (cur.length) flushPings();
+    }).catch(function () { flushing = false; });
+  }
+  window.addEventListener("online", flushPings);
+  setTimeout(flushPings, 1500);
+
   // ---- Plan for today ----
   var todayKey = T.dateKey(new Date());
   var plan, S, st; // plan, steps, state
@@ -133,6 +158,11 @@
     if (!st.finished) {
       st.finished = true;
       st.finishedAt = Date.now();
+      try {
+        var tag = load("trx:pingPrefix", "") || "done"; // tests set "test" so the bot ignores them
+        queuePing(plan.key, JSON.stringify({ t: tag, d: plan.key, type: plan.focus.toUpperCase(),
+          sec: st.startedAt ? Math.round((st.finishedAt - st.startedAt) / 1000) : 0, ex: plan.moves }));
+      } catch (e) {}
       beep(784, 0.2, 0.35); setTimeout(function () { beep(1046, 0.2, 0.35); }, 200); setTimeout(function () { beep(1318, 0.45, 0.35); }, 400);
       var nr = nonRest(), dn = nr.filter(function (i) { return st.done[i]; }).length;
       var hist = load("trx:history", []);
