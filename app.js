@@ -37,6 +37,16 @@
       if (cur.length) flushPings();
     }).catch(function () { flushing = false; });
   }
+  // Difficulty rating (1 easy, 2 solid, 3 brutal): a small follow-up ping, latest wins.
+  function queueRating(dateKey, r) {
+    save("trx:rate:" + dateKey, r);
+    var pre = load("trx:pingPrefix", ""), tag = pre ? pre + "-rate" : "rate"; // tests: "test-rate", ignored by the bot
+    var q = load("trx:pingq", []);
+    // Drop any older unsent rating for this date (except one already in flight).
+    q = q.filter(function (b, i) { if (flushing && i === 0) return true; try { var j = JSON.parse(b); return !(/rate$/.test(j.t) && j.d === dateKey); } catch (e) { return true; } });
+    q.push(JSON.stringify({ t: tag, d: dateKey, r: r })); save("trx:pingq", q);
+    flushPings();
+  }
   window.addEventListener("online", flushPings);
   setTimeout(flushPings, 1500);
 
@@ -287,6 +297,7 @@
       $("finishTime").textContent = fmtElapsed(ms);
       var sk = streak();
       $("finishStreak").textContent = sk.streak > 1 ? sk.streak + "-day streak" : "";
+      renderRate();
       if (wasHidden) renderTomorrow();
     } else fin.hidden = true;
   }
@@ -413,6 +424,16 @@
   $("playBtn").addEventListener("click", toggle);
   $("clock").addEventListener("click", function () { if (Date.now() - lastSwipe > 400) toggle(); });
   $("plusBtn").addEventListener("click", function () { st.left += 15; if (running) endAt += 15000; persist(); render(); });
+  function renderRate() {
+    var r = load("trx:rate:" + plan.key, 0), bs = $("rate").querySelectorAll(".rateBtn");
+    $("rate").classList.toggle("has", !!r);
+    for (var i = 0; i < bs.length; i++) { var on = +bs[i].dataset.r === r; bs[i].classList.toggle("on", on); bs[i].setAttribute("aria-pressed", on ? "true" : "false"); }
+  }
+  $("rate").addEventListener("click", function (e) {
+    var b = e.target.closest(".rateBtn"); if (!b) return;
+    var r = +b.dataset.r; if (r === load("trx:rate:" + plan.key, 0)) return;
+    queueRating(plan.key, r); renderRate();
+  });
   $("againBtn").addEventListener("click", function () { pendingOv = null; reset(); });
   $("saveBtn").addEventListener("click", saveTomorrow);
   $("timerCue").addEventListener("click", function () { if (window.TRXTimer) window.TRXTimer.open(); });

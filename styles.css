@@ -97,6 +97,17 @@ body {
 .hRow { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-size: 16px; line-height: 1.4; margin: 0; padding: 10px 0; border-top: 1px solid #333; }
 .hRow b { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
 
+/* Finish: difficulty rating */
+.rate { display: flex; justify-content: center; gap: 12px; margin: 2.6vh 0 0; }
+.rateBtn { flex: 0 0 auto; width: 84px; min-height: 76px; border: 2px solid #2e2e2e; border-radius: 18px; background: var(--bg); color: var(--fg);
+  font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 0; cursor: pointer; touch-action: manipulation; transition: opacity .15s, border-color .15s; }
+.rateIco { font-size: 34px; line-height: 1; }
+.rateLbl { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.rate.has .rateBtn { opacity: .35; }
+.rate.has .rateBtn.on { opacity: 1; border: 3px solid var(--fg); }
+.rate.has .rateBtn.on .rateLbl { color: var(--fg); }
+@media (max-height: 700px) { .rateBtn { min-height: 62px; width: 78px; } .rateIco { font-size: 30px; } .rate { margin-top: 2vh; } .tmr { margin-top: 2.2vh; } .tmrList li { min-height: 46px; } .saveBtn { margin-top: 10px; min-height: 46px; } .again { margin-top: 1vh; padding: 10px 20px; } }
+
 /* Finish: save + timer cue */
 .saveBtn { display: block; margin: 16px auto 0; min-width: 160px; min-height: 52px; padding: 0 28px; border-radius: 26px; border: 3px solid var(--fg);
   background: var(--fg); color: var(--bg); font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
