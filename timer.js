@@ -71,7 +71,7 @@
     var app = A(); if (app.releaseWake) app.releaseWake(); if (app.maybeReload) app.maybeReload();
     render();
   }
-  function stop() { if (running) pause(); preset = null; done = false; $("tRun").hidden = true; $("tMenu").hidden = false; renderMenu(); }
+  function stop() { if (running) pause(); if (direct === "sw") { preset = null; done = false; close(); return; } preset = null; done = false; $("tRun").hidden = true; $("tMenu").hidden = false; renderMenu(); }
   function tick() {
     if (!running) return;
     if (sw) { var s = Math.floor(swMs() / 1000); if (s !== left) { left = s; render(); } return; }
@@ -139,8 +139,14 @@
   $("tStop").addEventListener("click", stop);
   $("tBack").addEventListener("click", function () { close(); });
 
-  function open() { $("timerPage").hidden = false; renderMenu(); }
-  function close() { if (running) pause(); $("timerPage").hidden = true; }
+  // open(): menu; open("sw"): straight into the stopwatch; open("intv"): menu with the Intervals editor open.
+  var direct = null;
+  function open(mode) {
+    direct = mode || null; $("timerPage").hidden = false; $("tRun").hidden = true; $("tMenu").hidden = false;
+    if (mode === "sw") { editing = null; start("sw"); return; }
+    editing = mode === "intv" ? "intv" : null; renderMenu();
+  }
+  function close() { if (running) pause(); $("timerPage").hidden = true; $("tRun").hidden = true; $("tMenu").hidden = false; direct = null; }
   window.TRXTimer = {
     open: open, close: close,
     isOpen: function () { return !$("timerPage").hidden; },

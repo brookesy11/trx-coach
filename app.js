@@ -45,6 +45,7 @@
     // Drop any older unsent rating for this date (except one already in flight).
     q = q.filter(function (b, i) { if (flushing && i === 0) return true; try { var j = JSON.parse(b); return !(/rate$/.test(j.t) && j.d === dateKey); } catch (e) { return true; } });
     q.push(JSON.stringify({ t: tag, d: dateKey, r: r })); save("trx:pingq", q);
+    var lg = load("trx:log", {}); if (lg[dateKey]) { lg[dateKey].r = r; save("trx:log", lg); }
     flushPings();
   }
   window.addEventListener("online", flushPings);
@@ -184,6 +185,13 @@
       var hist = load("trx:history", []);
       // Count toward the streak only if at least half the moves were done.
       if (dn * 2 >= nr.length && hist.indexOf(plan.key) === -1) { hist.push(plan.key); save("trx:history", hist); }
+      // On-device completion log (source for Home): { date: { type, sec, r } }.
+      if (dn * 2 >= nr.length) {
+        var lg = load("trx:log", {}), rt = load("trx:rate:" + plan.key, 0);
+        lg[plan.key] = { type: plan.focus, sec: st.startedAt ? Math.round((st.finishedAt - st.startedAt) / 1000) : 0 };
+        if (rt) lg[plan.key].r = rt;
+        save("trx:log", lg);
+      }
     }
     persist(); render();
     maybeReload();
@@ -193,6 +201,13 @@
     st = fresh(); persist(); render();
     maybeReload();
   }
+
+  // ---- Completion log: backfill from the older date-only history once ----
+  (function migrateLog() {
+    var lg = load("trx:log", null); if (lg) return;
+    lg = {}; load("trx:history", []).forEach(function (k) { try { lg[k] = { type: T.planFor(k, null).focus, sec: 0 }; } catch (e) {} });
+    save("trx:log", lg);
+  })();
 
   // ---- Streak ----
   function streak() {
@@ -254,6 +269,36 @@
   function infoStep() { var s = S[st.idx]; return s.kind === "rest" ? (nextWork(st.idx) || s) : s; }
   function setText(s) { return s.kind === "warm" ? s.set + " of " + s.sets : "Set " + s.set + " of " + s.sets; }
 
+  // ---- Home: week / month / year counts, month grid, year strip ----
+  function renderHome() {
+    var lg = load("trx:log", {}), today = T.parseKey(todayKey), y = today.getFullYear(), mo = today.getMonth();
+    var dow = (today.getDay() + 6) % 7, wk0 = new Date(y, mo, today.getDate() - dow), wkStart = T.dateKey(wk0);
+    var w = 0, m = 0, yr = 0, perMonth = [0,0,0,0,0,0,0,0,0,0,0,0];
+    Object.keys(lg).forEach(function (k) {
+      if (k > todayKey) return;
+      var d = T.parseKey(k); if (d.getFullYear() !== y) return;
+      yr++; perMonth[d.getMonth()]++;
+      if (d.getMonth() === mo) m++;
+      if (k >= wkStart) w++;
+    });
+    $("stWeek").textContent = w; $("stMonth").textContent = m; $("stYear").textContent = yr;
+    var sk = streak(); $("hStreak").textContent = sk.streak > 1 ? sk.streak + "-day streak" : "";
+    $("calHead").textContent = today.toLocaleDateString(undefined, { month: "long" });
+    var g = $("calGrid"), html = "", first = (new Date(y, mo, 1).getDay() + 6) % 7, n = new Date(y, mo + 1, 0).getDate();
+    for (var i = 0; i < first; i++) html += '<span class="pad"></span>';
+    for (var dd = 1; dd <= n; dd++) {
+      var k = T.dateKey(new Date(y, mo, dd)), cls = lg[k] ? "on" : k > todayKey ? "fut" : "";
+      if (k === todayKey) cls += " today";
+      html += '<span class="' + cls + '" title="' + k + '"></span>';
+    }
+    g.innerHTML = html;
+    var yh = "";
+    for (var mi = 0; mi < 12; mi++) { var days = new Date(y, mi + 1, 0).getDate(); yh += '<i><b style="width:' + Math.min(100, perMonth[mi] / days * 100).toFixed(1) + '%"></b></i>'; }
+    $("yearRow").innerHTML = yh;
+    var tp = T.planFor(tomorrowKey(), loadOv(tomorrowKey()));
+    $("hNext").textContent = "Tomorrow \u00b7 " + tp.focus;
+  }
+
   function render() {
     var s = S[st.idx];
     $("focus").textContent = plan.focus;
@@ -288,8 +333,10 @@
     }
     if (!$("howto").hidden) $("hClock").textContent = (s.kind === "rest" ? "Rest " : "") + fmt(st.left);
     // finish
-    var fin = $("finish");
-    if (st.finished) {
+    var fin = $("finish"), closed = st.finished && load("trx:closed:" + plan.key, false);
+    $("home").hidden = !closed;
+    if (closed) { fin.hidden = true; renderHome(); }
+    else if (st.finished) {
       var wasHidden = fin.hidden;
       fin.hidden = false;
       $("finishFocus").textContent = plan.focus + " \u00b7 Done";
@@ -414,7 +461,7 @@
       if (dx < 0) next(); else back();
     } else snapBack();
   }
-  [document.getElementById("app"), $("finish"), $("timerPage")].forEach(function (el) {
+  [document.getElementById("app"), $("finish"), $("home"), $("timerPage")].forEach(function (el) {
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchmove", onMove, { passive: false });
     el.addEventListener("touchend", onEnd, { passive: true });
@@ -434,9 +481,21 @@
     var r = +b.dataset.r; if (r === load("trx:rate:" + plan.key, 0)) return;
     queueRating(plan.key, r); renderRate();
   });
-  $("againBtn").addEventListener("click", function () { pendingOv = null; reset(); });
   $("saveBtn").addEventListener("click", saveTomorrow);
-  $("timerCue").addEventListener("click", function () { if (window.TRXTimer) window.TRXTimer.open(); });
+  // Finished: auto-save pending swaps, close the day, go Home until tomorrow.
+  $("finishedBtn").addEventListener("click", function () {
+    if (pendingOv && !ovEqual(pendingOv, loadOv(tomorrowKey()))) saveOv(tomorrowKey(), JSON.parse(JSON.stringify(pendingOv)));
+    save("trx:closed:" + plan.key, true); render();
+  });
+  $("redoBtn").addEventListener("click", function () {
+    try { localStorage.removeItem("trx:closed:" + plan.key); } catch (e) {}
+    pendingOv = null; reset();
+  });
+  $("home").querySelector(".hTimers").addEventListener("click", function (e) {
+    var b = e.target.closest(".hTimer"); if (b && window.TRXTimer) window.TRXTimer.open(b.dataset.t);
+  });
+  // A new local day while Home (or the finish screen) is up: show the new workout.
+  setInterval(function () { if (!running && T.dateKey(new Date()) !== todayKey && !(window.TRXTimer && window.TRXTimer.isRunning())) { pendingOv = null; initDay(); } }, 30000);
   document.addEventListener("keydown", function (e) {
     if (!$("howto").hidden) return;
     var TT = window.TRXTimer;

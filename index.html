@@ -83,6 +83,29 @@
   </div>
 </div>
 
+<section id="home" class="home" hidden>
+  <div class="homeInner">
+    <div class="hStats">
+      <div class="hStat"><b id="stWeek">0</b><span>Week</span></div>
+      <div class="hStat"><b id="stMonth">0</b><span>Month</span></div>
+      <div class="hStat"><b id="stYear">0</b><span>Year</span></div>
+    </div>
+    <p class="hStreak" id="hStreak"></p>
+    <div class="cal">
+      <p class="calHead" id="calHead">Month</p>
+      <div class="calDow" aria-hidden="true"><i>M</i><i>T</i><i>W</i><i>T</i><i>F</i><i>S</i><i>S</i></div>
+      <div class="calGrid" id="calGrid"></div>
+      <div class="yearRow" id="yearRow" aria-hidden="true"></div>
+    </div>
+    <p class="hNext" id="hNext"></p>
+    <div class="hTimers">
+      <button class="hTimer" type="button" data-t="sw">Stopwatch</button>
+      <button class="hTimer" type="button" data-t="intv">Intervals</button>
+    </div>
+    <button id="redoBtn" class="redo" type="button">Redo today</button>
+  </div>
+</section>
+
 <section id="finish" class="finish" hidden>
   <div class="finishInner">
     <p class="finishKicker" id="finishFocus">Workout</p>
@@ -98,12 +121,8 @@
       <ol class="tmrList" id="tmrList"></ol>
     </div>
     <button id="saveBtn" class="saveBtn" type="button" hidden>Save</button>
-    <button id="againBtn" class="again" type="button">Again</button>
+    <button id="finishedBtn" class="finishedBtn" type="button">Finished</button>
   </div>
-  <button id="timerCue" class="timerCue" type="button" aria-label="Open timer">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 13.5V9.5M9.5 3h5M12 3v3M18.2 6.8l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-    <span aria-hidden="true">&rsaquo;</span>
-  </button>
 </section>
 
 <video id="nosleep" playsinline muted loop preload="auto" aria-hidden="true" tabindex="-1">
