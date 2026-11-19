@@ -99,7 +99,21 @@
   }
 
   // Build the plan for a local date key ("YYYY-MM-DD").
-  function planFor(key) {
+  // name -> cue lookup for every main and abs move
+  var CUES = {};
+  DAYS.forEach(function (d) { d.slots.forEach(function (sl) { sl.forEach(function (o) { CUES[o[1]] = o[2]; }); }); });
+  ABS.forEach(function (a) { CUES[a[0]] = a[1]; });
+  function dayPool(type) { var seen = {}, out = []; DAYS[type].slots.forEach(function (sl) { sl.forEach(function (o) { if (!seen[o[1]]) { seen[o[1]] = 1; out.push(o[1]); } }); }); return out; }
+  function isAbs(name) { return ABS.some(function (a) { return a[0] === name; }); }
+
+  // Swap candidates for one slot (0-3 main, 4 abs): same day-type pool (or abs pool), no duplicates within the day.
+  function swapOptions(key, slot, currentMoves) {
+    var pool = slot === 4 ? ABS.map(function (a) { return a[0]; }) : dayPool(dayInfo(key).type);
+    return pool.filter(function (n) { return currentMoves.indexOf(n) === -1; });
+  }
+
+  // overrides: optional { slotIndex: moveName } (user swaps), applied after the normal pick.
+  function planFor(key, overrides) {
     var info = dayInfo(key), day = DAYS[info.type];
     var r = rng(hash("trx2:" + day.key + ":" + info.cycle)), used = {};
     // Even cycles use the staple (most proven) move in each slot; odd cycles draw by weight for variety.
@@ -110,6 +124,16 @@
     });
     var ab = ABS[mod(info.n, ABS.length)];
     moves.push({ name: ab[0], cue: ab[1], abs: true });
+    if (overrides) {
+      var dayNames = dayPool(info.type);
+      Object.keys(overrides).forEach(function (k) {
+        var i = +k, n = overrides[k];
+        if (!(i >= 0 && i < moves.length) || !CUES[n]) return;
+        if (i === 4 ? !isAbs(n) : dayNames.indexOf(n) === -1) return; // must fit the slot's pool
+        if (moves.some(function (m, j) { return j !== i && m.name === n; })) return; // no duplicates
+        moves[i] = { name: n, cue: CUES[n], abs: i === 4, swapped: true };
+      });
+    }
 
     // Straight sets: all sets of one exercise, then the next. Warm-up first.
     var steps = [], nW = day.warm.length;
@@ -130,6 +154,6 @@
     };
   }
 
-  root.TRX = { planFor: planFor, dateKey: dateKey, parseKey: parseKey, dayNumber: dayNumber, DAYS: DAYS, ABS: ABS, WORK: WORK, REST: REST };
+  root.TRX = { planFor: planFor, swapOptions: swapOptions, dateKey: dateKey, parseKey: parseKey, dayNumber: dayNumber, DAYS: DAYS, ABS: ABS, WORK: WORK, REST: REST };
   if (typeof module !== "undefined") module.exports = root.TRX;
 })(typeof window !== "undefined" ? window : globalThis);

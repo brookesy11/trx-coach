@@ -8,6 +8,10 @@
   function load(k, dflt) { try { var v = LS.getItem(k); return v ? JSON.parse(v) : dflt; } catch (e) { return dflt; } }
   function save(k, v) { try { LS.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
+  // ---- User swaps, per date: trx:ov:YYYY-MM-DD = { slot: name } ----
+  function loadOv(k) { return load("trx:ov:" + k, null); }
+  function saveOv(k, ov) { save("trx:ov:" + k, ov); }
+
   // ---- Plan for today ----
   var todayKey = T.dateKey(new Date());
   var plan, S, st; // plan, steps, state
@@ -16,7 +20,7 @@
 
   function initDay() {
     todayKey = T.dateKey(new Date());
-    plan = T.planFor(todayKey);
+    plan = T.planFor(todayKey, loadOv(todayKey));
     S = plan.steps;
     var saved = load("trx:day", null);
     if (saved && saved.key === plan.key && saved.sig === plan.sig && saved.done && saved.done.length === S.length) st = saved;
@@ -128,6 +132,7 @@
     running = false; clearInterval(timer); releaseWake();
     if (!st.finished) {
       st.finished = true;
+      st.finishedAt = Date.now();
       beep(784, 0.2, 0.35); setTimeout(function () { beep(1046, 0.2, 0.35); }, 200); setTimeout(function () { beep(1318, 0.45, 0.35); }, 400);
       var nr = nonRest(), dn = nr.filter(function (i) { return st.done[i]; }).length;
       var hist = load("trx:history", []);
@@ -155,6 +160,35 @@
 
   // ---- Render ----
   function fmt(s) { var m = Math.floor(s / 60), r = s % 60; return m + ":" + (r < 10 ? "0" : "") + r; }
+  function fmtElapsed(ms) {
+    var t = Math.max(0, Math.round(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return h ? h + ":" + p(m) + ":" + p(s) : m + ":" + p(s);
+  }
+  function tomorrowKey() { var d = T.parseKey(todayKey); d.setDate(d.getDate() + 1); return T.dateKey(d); }
+  function renderTomorrow() {
+    var k = tomorrowKey(), tp = T.planFor(k, loadOv(k));
+    $("tmrHead").textContent = "Tomorrow \u00b7 " + tp.focus;
+    var ol = $("tmrList"); ol.innerHTML = "";
+    tp.moves.forEach(function (name, slot) {
+      var li = document.createElement("li");
+      var nb = document.createElement("button"); nb.type = "button"; nb.className = "tmrName"; nb.textContent = name;
+      nb.addEventListener("click", function () { if (Date.now() - lastSwipe > 400) openHowto(name); });
+      var sb = document.createElement("button"); sb.type = "button"; sb.className = "tmrSwap"; sb.textContent = "\u21bb";
+      sb.setAttribute("aria-label", "Swap " + name);
+      sb.addEventListener("click", function () { swapTomorrow(slot); });
+      li.appendChild(nb); li.appendChild(sb); ol.appendChild(li);
+    });
+  }
+  function swapTomorrow(slot) {
+    var k = tomorrowKey(), ov = loadOv(k) || {}, tp = T.planFor(k, ov);
+    var opts = T.swapOptions(k, slot, tp.moves);
+    if (!opts.length) return;
+    ov[slot] = opts[Math.floor(Math.random() * opts.length)];
+    saveOv(k, ov);
+    renderTomorrow();
+    var b = $("tmrList").children[slot].querySelector(".tmrSwap"); b.classList.add("spin");
+  }
   function fmtDate(k) { return T.parseKey(k).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }); }
   function nonRest() { var a = []; S.forEach(function (s, i) { if (s.kind !== "rest") a.push(i); }); return a; }
 
@@ -198,13 +232,14 @@
     // finish
     var fin = $("finish");
     if (st.finished) {
+      var wasHidden = fin.hidden;
       fin.hidden = false;
-      $("finishFocus").textContent = plan.focus + " \u00b7 " + fmtDate(plan.key);
-      $("finishStat").textContent = doneCount + " of " + nr.length + " sets \u00b7 " + Math.round(plan.total / 60) + " min";
+      $("finishFocus").textContent = plan.focus + " \u00b7 Done";
+      var ms = st.startedAt && st.finishedAt ? st.finishedAt - st.startedAt : 0;
+      $("finishTime").textContent = fmtElapsed(ms);
       var sk = streak();
-      $("finishStreak").textContent = sk.streak > 1 ? sk.streak + "-day streak" : (sk.total ? sk.total + (sk.total === 1 ? " session" : " sessions") : "");
-      var tm = new Date(T.parseKey(plan.key).getTime()); tm.setDate(tm.getDate() + 1);
-      $("finishTomorrow").textContent = "Tomorrow: " + T.planFor(T.dateKey(tm)).focus;
+      $("finishStreak").textContent = sk.streak > 1 ? sk.streak + "-day streak" : "";
+      if (wasHidden) renderTomorrow();
     } else fin.hidden = true;
   }
 
@@ -220,7 +255,7 @@
     groups.forEach(function (g) {
       var b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.dataset.ex = g.ex;
       b.setAttribute("aria-label", g.label);
-      b.innerHTML = '<span class="n"></span><span class="pbar"><span class="pfill"></span></span>';
+      b.innerHTML = '<span class="pfill"></span><span class="n"></span>';
       b.querySelector(".n").textContent = g.n;
       b.addEventListener("click", function () { jumpToEx(g.ex); });
       nav.appendChild(b);
@@ -229,8 +264,8 @@
 
   var lastSwipe = 0;
   // ---- How-to popup (timer keeps running; the sheet shows the live countdown) ----
-  function openHowto() {
-    var s = infoStep(), h = (window.HOWTO || {})[s.name];
+  function openHowto(forName) {
+    var s = typeof forName === "string" ? { name: forName, cue: "" } : infoStep(), h = (window.HOWTO || {})[s.name];
     $("hName").textContent = s.name;
     $("hSetup").textContent = h ? h.setup : s.cue;
     var ol = $("hSteps"); ol.innerHTML = "";
@@ -284,6 +319,7 @@
   function snapBack() { inner.classList.remove("dragging"); inner.style.transform = ""; inner.style.opacity = ""; }
   function next() {
     if (st.finished) return;
+    if (!st.startedAt) st.startedAt = Date.now();
     unlockAudio();
     slide(-1, function () { goTo(st.idx + 1, true); });
   }

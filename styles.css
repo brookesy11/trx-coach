@@ -54,22 +54,31 @@ body {
 .chip { min-height: 74px; border: 2px solid #6a6a6a; border-radius: 16px; background: var(--bg); color: var(--fg); font: inherit;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 0; touch-action: manipulation; }
 .chip .n { font-size: 24px; font-weight: 800; line-height: 1; }
-.chip .pbar { display: block; width: 68%; height: 6px; border-radius: 3px; background: #262626; overflow: hidden; }
-.chip .pfill { display: block; height: 100%; width: 0; background: #fff; border-radius: 3px; transition: width .25s ease-out; }
+/* Whole chip fills white left to right as sets complete; the number flips to black over the white part. */
+.chip { position: relative; overflow: hidden; isolation: isolate; }
+.chip .pfill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #fff; z-index: 0; transition: width .25s ease-out; }
+.chip .n { position: relative; z-index: 1; color: #fff; mix-blend-mode: difference; }
 .chip.cur { border: 3px solid #fff; box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
 .chip.done:not(.cur) { border-color: #fff; }
 
 .finish { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 10; touch-action: pan-y;
   padding: calc(var(--sat) + 20px) calc(var(--sar) + 24px) calc(var(--sab) + 20px) calc(var(--sal) + 24px); }
 .finish[hidden] { display: none; }
-.finishInner { width: 100%; max-width: 420px; text-align: center; }
-.finishKicker { font-size: 18px; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; font-weight: 700; margin: 0; }
-.finishTitle { font-size: min(30vw, 140px); font-weight: 900; margin: 6px 0 10px; letter-spacing: -0.04em; line-height: 1; }
-.finishStat { font-size: 22px; margin: 0; font-weight: 700; }
-.finishStreak, .finishTomorrow { font-size: 16px; color: var(--dim); margin: 10px 0 0; }
-.again { margin-top: 30px; background: none; border: 0; color: var(--fg); font: inherit; font-size: 20px; font-weight: 800;
+.finishInner { width: 100%; max-width: 420px; text-align: center; max-height: 100%; overflow-y: auto; }
+.finishKicker { font-size: 18px; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; font-weight: 800; margin: 0; }
+.finishTime { font-size: min(30vw, 19vh, 150px); font-weight: 800; line-height: 1; margin: 4px 0 0; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.finishStreak { font-size: 16px; color: var(--dim); margin: 6px 0 0; min-height: 0; }
+.finishStreak:empty { display: none; }
+.tmr { margin-top: 3.5vh; text-align: left; }
+.tmrHead { text-align: center; font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); margin: 0 0 6px; }
+.tmrList { list-style: none; margin: 0; padding: 0; border-top: 1px solid #2a2a2a; }
+.tmrList li { display: flex; align-items: center; border-bottom: 1px solid #2a2a2a; min-height: 52px; }
+.tmrName { flex: 1; background: none; border: 0; color: var(--fg); font: inherit; font-size: clamp(18px, 5.4vw, 22px); font-weight: 700; text-align: left; padding: 8px 0; cursor: pointer; }
+.tmrSwap { flex: 0 0 auto; width: 48px; height: 48px; background: none; border: 0; color: var(--fg); font-size: 26px; line-height: 1; cursor: pointer; padding: 0; touch-action: manipulation; }
+.tmrSwap.spin { animation: spin .35s ease-out; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.again { margin-top: 2.5vh; background: none; border: 0; color: var(--fg); font: inherit; font-size: 20px; font-weight: 800;
   text-decoration: underline; text-underline-offset: 4px; padding: 12px 20px; cursor: pointer; }
-.finishHint { font-size: 13px; color: var(--dim); margin: 4px 0 0; }
 #nosleep { position: fixed; width: 1px; height: 1px; opacity: 0.01; left: -10px; bottom: 0; pointer-events: none; }
 @media (max-height: 700px) { .chip { min-height: 64px; } .chip .n { font-size: 21px; } }
 
