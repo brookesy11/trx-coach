@@ -1,5 +1,5 @@
 /* TRX Coach service worker: cache everything for offline use. */
-var CACHE = "trx-coach-v1";
+var CACHE = "trx-coach-v2";
 var ASSETS = ["./", "index.html", "styles.css", "app.js", "workouts.js", "manifest.json",
   "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 

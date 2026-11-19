@@ -10,18 +10,16 @@
 
   // ---- Plan for today ----
   var todayKey = T.dateKey(new Date());
-  var startKey = load("trx:start", null);
-  if (!startKey) { startKey = todayKey; save("trx:start", startKey); }
   var plan, S, st; // plan, steps, state
 
-  function fresh() { return { key: plan.key, idx: 0, left: S[0].secs, done: S.map(function () { return false; }), finished: false, startedAt: null }; }
+  function fresh() { return { key: plan.key, sig: plan.sig, idx: 0, left: S[0].secs, done: S.map(function () { return false; }), finished: false, startedAt: null }; }
 
   function initDay() {
     todayKey = T.dateKey(new Date());
-    plan = T.planFor(todayKey, startKey);
+    plan = T.planFor(todayKey);
     S = plan.steps;
     var saved = load("trx:day", null);
-    if (saved && saved.key === plan.key && saved.done && saved.done.length === S.length) st = saved;
+    if (saved && saved.key === plan.key && saved.sig === plan.sig && saved.done && saved.done.length === S.length) st = saved;
     else st = fresh();
     running = false;
     renderList(); render();
@@ -155,7 +153,7 @@
 
   function render() {
     var s = S[st.idx];
-    $("focus").textContent = plan.focus + " \u00b7 Week " + plan.week;
+    $("focus").textContent = plan.focus + " \u00b7 Day " + plan.dayOfCycle + " of 4";
     $("date").textContent = fmtDate(plan.key);
     $("section").textContent = s.label;
     var nr = nonRest(), doneCount = nr.filter(function (i) { return st.done[i]; }).length;
@@ -187,7 +185,7 @@
       var sk = streak();
       $("finishStreak").textContent = sk.streak > 1 ? sk.streak + "-day streak \u00b7 " + sk.total + " sessions total" : (sk.total ? sk.total + (sk.total === 1 ? " session" : " sessions") + " completed" : "Finish at least half the moves to start a streak");
       var tm = new Date(T.parseKey(plan.key).getTime()); tm.setDate(tm.getDate() + 1);
-      $("finishTomorrow").textContent = "Tomorrow: " + T.planFor(T.dateKey(tm), startKey).focus;
+      $("finishTomorrow").textContent = "Tomorrow: " + T.planFor(T.dateKey(tm)).focus;
     } else fin.hidden = true;
   }
 
@@ -199,7 +197,7 @@
       var b = document.createElement("button"); b.type = "button";
       b.innerHTML = '<span class="chk" aria-hidden="true"></span><span class="nm"></span><span class="tag"></span>';
       b.querySelector(".nm").textContent = s.name;
-      b.querySelector(".tag").textContent = (s.kind === "work" ? s.label.replace(" of 3", "") : s.label) + " \u00b7 " + s.secs + "s";
+      b.querySelector(".tag").textContent = (s.kind === "work" ? s.label.replace(/ of \d+/, "") : s.label) + " \u00b7 " + s.secs + "s";
       b.addEventListener("click", function () { goTo(i, false); window.scrollTo({ top: 0, behavior: "smooth" }); });
       li.appendChild(b); ol.appendChild(li);
     });
