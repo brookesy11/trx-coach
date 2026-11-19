@@ -44,27 +44,18 @@
 </main>
 
 <section id="timerPage" class="timerPage" hidden>
-  <div id="tMenu" class="tMenu">
-    <div class="tTop"><button id="tBack" class="tIcon" type="button" aria-label="Back">&lsaquo;</button><span class="tTitle">Timer</span><span class="tIconSpacer"></span></div>
-    <div class="tGrid" id="tGrid">
-      <button class="tPre" data-p="sw">Stopwatch</button>
-      <button class="tPre" data-p="intv">Intervals</button>
-    </div>
-    <div id="tEdit" class="tEdit" hidden>
-      <div id="tFields"></div>
-      <button id="tGo" class="tGo" type="button">Start</button>
-    </div>
+  <div class="tTop"><button id="tClose" class="tIcon" type="button" aria-label="Home">&times;</button><span id="tTitle" class="tTitle">Timer</span><span class="tIconSpacer"></span></div>
+  <div id="tEdit" class="tEdit" hidden>
+    <div id="tFields"></div>
+    <button id="tGo" class="tGo" type="button">Start</button>
   </div>
   <div id="tRun" class="tRun" hidden>
-    <div class="tTop"><button id="tStop" class="tIcon" type="button" aria-label="Stop">&times;</button><span id="tRound" class="tRound"></span><span class="tIconSpacer"></span></div>
-    <div class="tStage">
-      <div id="tState" class="tState">Ready</div>
-      <div class="tDial">
-        <svg class="tRing" viewBox="0 0 100 100" aria-hidden="true"><circle class="tTrack" cx="50" cy="50" r="48"/><circle id="tArc" class="tArc" cx="50" cy="50" r="48" pathLength="1"/></svg>
-        <div id="tTime" class="tTime" role="button" aria-label="Tap to start or pause">0</div>
-      </div>
-      <div id="tHint" class="tHint"></div>
+    <div id="tState" class="tState">Ready</div>
+    <div class="tDial" id="tDial" role="button" aria-label="Tap to pause or resume">
+      <svg class="tRing" viewBox="0 0 100 100" aria-hidden="true"><circle class="tTrack" cx="50" cy="50" r="48"/><circle id="tArc" class="tArc" cx="50" cy="50" r="48" pathLength="1"/></svg>
+      <div id="tTime" class="tTime">0</div>
     </div>
+    <div id="tHint" class="tHint"></div>
   </div>
 </section>
 

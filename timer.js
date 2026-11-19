@@ -1,4 +1,4 @@
-/* TRX Coach - extra timer page: Stopwatch or Intervals, with a thin progress ring.
+/* TRX Coach - timers opened from Home: Stopwatch (starts at once) or Intervals (editor, then run).
    Independent of the workout: no effect on progress, completion ping or stats. */
 (function () {
   "use strict";
@@ -12,7 +12,7 @@
   var cfg = load("trx:timer:cfg2", null);
   if (!cfg || !(cfg.work > 0) || !(cfg.rest >= 0) || !(cfg.rounds > 0)) { cfg = { work: DEF.work, rest: DEF.rest, rounds: DEF.rounds }; save("trx:timer:cfg2", cfg); }
   try { localStorage.removeItem("trx:timer:cfg"); } catch (e) {}
-  var last = load("trx:timer:last", null); if (last !== "sw" && last !== "intv") last = null;
+  try { localStorage.removeItem("trx:timer:last"); } catch (e) {} // no menu any more
   var READY = 3;
 
   function phases() {
@@ -25,7 +25,7 @@
   }
 
   // ---- Run engine ----
-  var preset = null, ph = [], pi = 0, left = 0, remMs = 0, endAt = 0, running = false, timer = null, raf = 0,
+  var mode = null, ph = [], pi = 0, left = 0, remMs = 0, endAt = 0, running = false, timer = null, raf = 0,
       sw = false, swAcc = 0, swStart = 0, done = false;
   function fmt(s) { if (s < 60) return String(s); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60; return (h ? h + ":" + (m < 10 ? "0" : "") : "") + m + ":" + (r < 10 ? "0" : "") + r; }
   function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
@@ -46,15 +46,14 @@
     var a = $("tArc"); a.style.strokeDashoffset = String(1 - f); a.style.visibility = f < 0.003 ? "hidden" : "visible";
   }
   function frame() { ring(); raf = running ? requestAnimationFrame(frame) : 0; }
-  function start(p) {
-    preset = p; last = p; save("trx:timer:last", p);
-    sw = p === "sw"; done = false; pi = 0; swAcc = 0;
+  function begin() {
+    sw = mode === "sw"; done = false; pi = 0; swAcc = 0;
     ph = sw ? [] : phases(); left = sw ? 0 : ph[0].secs; remMs = left * 1000;
-    $("tMenu").hidden = true; $("tRun").hidden = false;
+    $("tEdit").hidden = true; $("tRun").hidden = false;
     play();
   }
   function play() {
-    if (done) { start(preset); return; }
+    if (done) { begin(); return; }
     var app = A(); if (app.unlockAudio) app.unlockAudio();
     running = true;
     if (sw) swStart = Date.now(); else endAt = Date.now() + remMs;
@@ -71,7 +70,7 @@
     var app = A(); if (app.releaseWake) app.releaseWake(); if (app.maybeReload) app.maybeReload();
     render();
   }
-  function stop() { if (running) pause(); if (direct === "sw") { preset = null; done = false; close(); return; } preset = null; done = false; $("tRun").hidden = true; $("tMenu").hidden = false; renderMenu(); }
+  function toggle() { if ($("tRun").hidden) return; running ? pause() : play(); }
   function tick() {
     if (!running) return;
     if (sw) { var s = Math.floor(swMs() / 1000); if (s !== left) { left = s; render(); } return; }
@@ -88,69 +87,60 @@
     }
     render();
   }
+  // Same layout for both: state label, ring + digits, one hint line.
   function render() {
     var run = $("tRun"), p = ph[pi] || { kind: "work", label: "" };
-    var t = fmt(left), te = $("tTime");
+    var t = done ? "\u2713" : fmt(left), te = $("tTime");
     te.textContent = t; te.classList.toggle("long", t.length > 2 && t.length <= 5); te.classList.toggle("xlong", t.length > 5);
-    $("tState").textContent = done ? "Done" : sw ? "Stopwatch" : p.label;
-    $("tRound").textContent = !sw && p.of > 1 ? (p.round || 1) + " / " + p.of : "";
-    var fresh = sw ? !swAcc : (pi === 0 && remMs === (ph[0] ? ph[0].secs * 1000 : 0));
-    $("tHint").textContent = done ? "Tap to go again" : running ? "" : "Tap to " + (fresh ? "start" : "resume");
+    $("tState").textContent = done ? "Done" : sw ? "Elapsed" : p.label;
+    var hint = "";
+    if (done) hint = "Tap to restart";
+    else if (!running) hint = "Paused \u00b7 tap to resume";
+    else if (!sw && p.of) hint = "Round " + p.round + " of " + p.of;
+    $("tHint").textContent = hint;
     run.classList.toggle("rest", !done && p.kind === "rest");
     run.classList.toggle("ready", !done && p.kind === "ready" && !sw);
     run.classList.toggle("paused", !running && !done);
     ring();
   }
 
-  // ---- Menu: two big choices; Intervals opens the -/+ editor ----
-  var editing = null;
+  // ---- Intervals editor ----
   var FIELDS = [["Work", "work", 5, 5, 600, true], ["Rest", "rest", 5, 0, 600, true], ["Rounds", "rounds", 1, 1, 50, false]];
   function fv(v, isTime) { if (!isTime) return String(v); var m = Math.floor(v / 60), s = v % 60; return v < 60 ? v + "s" : m + ":" + (s < 10 ? "0" : "") + s; }
-  function renderMenu() {
-    var btns = $("tGrid").querySelectorAll(".tPre");
-    for (var i = 0; i < btns.length; i++) {
-      var id = btns[i].dataset.p;
-      btns[i].classList.toggle("last", id === last && id !== editing);
-      btns[i].classList.toggle("sel", id === editing);
-    }
-    var ed = $("tEdit");
-    if (!editing) { ed.hidden = true; return; }
-    ed.hidden = false;
+  function renderEditor() {
     var box = $("tFields"); box.innerHTML = "";
     FIELDS.forEach(function (f) {
       var row = document.createElement("div"); row.className = "tField";
-      row.innerHTML = '<label></label><button class="tStep" type="button" aria-label="Less">&minus;</button><span class="v"></span><button class="tStep" type="button" aria-label="More">+</button>';
+      row.innerHTML = '<label></label><button class="tStep" type="button">&minus;</button><span class="v"></span><button class="tStep" type="button">+</button>';
       row.querySelector("label").textContent = f[0];
       row.querySelector(".v").textContent = fv(cfg[f[1]], f[5]);
       var bs = row.querySelectorAll(".tStep");
-      bs[0].addEventListener("click", function () { cfg[f[1]] = Math.max(f[3], cfg[f[1]] - f[2]); save("trx:timer:cfg2", cfg); renderMenu(); });
-      bs[1].addEventListener("click", function () { cfg[f[1]] = Math.min(f[4], cfg[f[1]] + f[2]); save("trx:timer:cfg2", cfg); renderMenu(); });
+      bs[0].setAttribute("aria-label", "Less " + f[0].toLowerCase()); bs[1].setAttribute("aria-label", "More " + f[0].toLowerCase());
+      bs[0].addEventListener("click", function () { cfg[f[1]] = Math.max(f[3], cfg[f[1]] - f[2]); save("trx:timer:cfg2", cfg); renderEditor(); });
+      bs[1].addEventListener("click", function () { cfg[f[1]] = Math.min(f[4], cfg[f[1]] + f[2]); save("trx:timer:cfg2", cfg); renderEditor(); });
       box.appendChild(row);
     });
   }
-  $("tGrid").addEventListener("click", function (e) {
-    var b = e.target.closest(".tPre"); if (!b) return;
-    var id = b.dataset.p;
-    if (id === "intv") { editing = editing === id ? null : id; renderMenu(); return; }
-    editing = null; start(id);
-  });
-  $("tGo").addEventListener("click", function () { editing = null; start("intv"); });
-  document.querySelector(".tDial").addEventListener("click", function () { running ? pause() : play(); });
-  $("tStop").addEventListener("click", stop);
-  $("tBack").addEventListener("click", function () { close(); });
+  $("tGo").addEventListener("click", begin);
+  $("tDial").addEventListener("click", toggle);
+  $("tClose").addEventListener("click", function () { close(); });
 
-  // open(): menu; open("sw"): straight into the stopwatch; open("intv"): menu with the Intervals editor open.
-  var direct = null;
-  function open(mode) {
-    direct = mode || null; $("timerPage").hidden = false; $("tRun").hidden = true; $("tMenu").hidden = false;
-    if (mode === "sw") { editing = null; start("sw"); return; }
-    editing = mode === "intv" ? "intv" : null; renderMenu();
+  // open("sw"): stopwatch starts at once. open("intv"): the editor, then Start. × always returns Home.
+  function open(m) {
+    mode = m === "sw" ? "sw" : "intv";
+    $("tTitle").textContent = mode === "sw" ? "Stopwatch" : "Intervals";
+    $("timerPage").hidden = false;
+    if (mode === "sw") begin();
+    else { $("tRun").hidden = true; $("tEdit").hidden = false; renderEditor(); }
   }
-  function close() { if (running) pause(); $("timerPage").hidden = true; $("tRun").hidden = true; $("tMenu").hidden = false; direct = null; }
+  function close() {
+    if (running) pause();
+    done = false; mode = null;
+    $("timerPage").hidden = true; $("tRun").hidden = true; $("tEdit").hidden = true;
+  }
   window.TRXTimer = {
-    open: open, close: close,
+    open: open, close: close, toggle: toggle,
     isOpen: function () { return !$("timerPage").hidden; },
-    isRunning: function () { return running; },
-    back: function () { if (!$("tRun").hidden) stop(); else close(); }
+    isRunning: function () { return running; }
   };
 })();

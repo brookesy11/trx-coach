@@ -478,13 +478,11 @@
     var t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
     if (horiz && Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       lastSwipe = Date.now();
-      var TT = window.TRXTimer;
-      if (TT && TT.isOpen()) { if (dx > 0) TT.close(); return; }
-      if (st.finished && dx < 0) { if (TT) TT.open(); return; }
+      if (st.finished || (window.TRXTimer && window.TRXTimer.isOpen())) return; // swipes only step through the workout
       if (dx < 0) next(); else back();
     } else snapBack();
   }
-  [document.getElementById("app"), $("finish"), $("home"), $("timerPage")].forEach(function (el) {
+  [document.getElementById("app")].forEach(function (el) {
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchmove", onMove, { passive: false });
     el.addEventListener("touchend", onEnd, { passive: true });
@@ -522,8 +520,8 @@
   document.addEventListener("keydown", function (e) {
     if (!$("howto").hidden) return;
     var TT = window.TRXTimer;
-    if (TT && TT.isOpen()) { if (e.key === "ArrowLeft") { e.preventDefault(); TT.close(); } return; }
-    if (st.finished && e.key === "ArrowRight") { e.preventDefault(); if (TT) TT.open(); return; }
+    if (TT && TT.isOpen()) { if (e.key === "Escape") { e.preventDefault(); TT.close(); } else if (e.key === " ") { e.preventDefault(); TT.toggle(); } return; }
+    if (st.finished) return;
     if (e.key === "ArrowRight") { e.preventDefault(); next(); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); back(); }
     else if (e.key === " ") { e.preventDefault(); toggle(); }
