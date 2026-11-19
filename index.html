@@ -47,10 +47,8 @@
   <div id="tMenu" class="tMenu">
     <div class="tTop"><button id="tBack" class="tIcon" type="button" aria-label="Back">&lsaquo;</button><span class="tTitle">Timer</span><span class="tIconSpacer"></span></div>
     <div class="tGrid" id="tGrid">
-      <button class="tPre" data-p="cd30">30s</button><button class="tPre" data-p="cd60">1m</button><button class="tPre" data-p="cd120">2m</button>
-      <button class="tPre" data-p="cd300">5m</button><button class="tPre" data-p="cd480">8m</button><button class="tPre" data-p="cdx">Custom</button>
-      <button class="tPre" data-p="tabata">Tabata</button><button class="tPre" data-p="emom">EMOM</button><button class="tPre" data-p="intv">Intervals</button>
-      <button class="tPre wide" data-p="sw">Stopwatch</button>
+      <button class="tPre" data-p="sw">Stopwatch</button>
+      <button class="tPre" data-p="intv">Intervals</button>
     </div>
     <div id="tEdit" class="tEdit" hidden>
       <div id="tFields"></div>
@@ -61,22 +59,14 @@
     <div class="tTop"><button id="tStop" class="tIcon" type="button" aria-label="Stop">&times;</button><span id="tRound" class="tRound"></span><span class="tIconSpacer"></span></div>
     <div class="tStage">
       <div id="tState" class="tState">Ready</div>
-      <div id="tTime" class="tTime" role="button" aria-label="Tap to start or pause">0</div>
+      <div class="tDial">
+        <svg class="tRing" viewBox="0 0 100 100" aria-hidden="true"><circle class="tTrack" cx="50" cy="50" r="48"/><circle id="tArc" class="tArc" cx="50" cy="50" r="48" pathLength="1"/></svg>
+        <div id="tTime" class="tTime" role="button" aria-label="Tap to start or pause">0</div>
+      </div>
       <div id="tHint" class="tHint"></div>
     </div>
   </div>
 </section>
-
-<div id="pair" class="modal" hidden>
-  <div class="sheet pairSheet" role="dialog" aria-modal="true" aria-label="Pair">
-    <div class="sheetTop"><span id="pairMsg" class="hClock"></span><button id="pairClose" class="x" type="button" aria-label="Close">&times;</button></div>
-    <input id="pairInput" class="pairInput" type="text" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Pairing code">
-    <div class="pairBtns">
-      <button id="pairGen" class="tGo pairGen" type="button">Generate</button>
-      <button id="pairGo" class="tGo" type="button">Pair</button>
-    </div>
-  </div>
-</div>
 
 <div id="howto" class="modal" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hName">

@@ -13,13 +13,9 @@
   function saveOv(k, ov) { save("trx:ov:" + k, ov); }
 
   // ---- Completion ping (ntfy.sh): once per date, queued until a POST succeeds ----
-  // The topic is never in the code: it is paired on the device (long-press the day label, or #pair=<code>).
+  // The topic is never in the code: it lives only in this device's localStorage (trx:ntfyTopic), set when the phone was paired.
   var TOPIC_RE = /^[A-Za-z0-9_-]{16,64}$/;
   function pingTopic() { var t = load("trx:ntfyTopic", ""); return TOPIC_RE.test(t) ? t : ""; }
-  (function readPairHash() {
-    var m = /[#&]pair=([A-Za-z0-9_-]{16,64})/.exec(location.hash || "");
-    if (m) { save("trx:ntfyTopic", m[1]); try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} }
-  })();
   function queuePing(dateKey, body) {
     if (load("trx:pinged:" + dateKey, false)) return;
     save("trx:pinged:" + dateKey, true);
@@ -444,54 +440,6 @@
     }
   });
   window.addEventListener("pagehide", persist);
-
-  // ---- Hidden pairing: long-press the day label (main or finish screen) ----
-  function openPair() {
-    $("pairInput").value = "";
-    $("pairMsg").textContent = pingTopic() ? "Paired" : "Not paired";
-    $("pair").hidden = false; pairOpenedAt = Date.now();
-  }
-  var pairOpenedAt = 0;
-  function closePair() { $("pair").hidden = true; }
-  function doPair() {
-    var v = ($("pairInput").value || "").trim().replace(/^.*pair=/, "");
-    if (!TOPIC_RE.test(v)) { $("pairMsg").textContent = "That code doesn't look right"; return; }
-    save("trx:ntfyTopic", v); $("pairMsg").textContent = "Paired \u2713"; flushPings();
-    setTimeout(closePair, 900);
-  }
-  function longPress(el, fn) {
-    var t = null, fired = false;
-    function clear() { if (t) { clearTimeout(t); t = null; } }
-    el.addEventListener("touchstart", function () { clear(); fired = false; t = setTimeout(function () { t = null; fired = true; fn(); }, 800); }, { passive: true });
-    el.addEventListener("touchend", function (e) { clear(); if (fired && e.cancelable) e.preventDefault(); }); el.addEventListener("touchmove", clear, { passive: true }); el.addEventListener("touchcancel", clear);
-    el.addEventListener("contextmenu", function (e) { e.preventDefault(); fn(); });
-  }
-  longPress($("focus"), openPair); longPress($("finishFocus"), openPair);
-  $("pairGo").addEventListener("click", doPair);
-  // Generate a fresh 32-char code on the phone, pair with it, and copy it for the bot.
-  function genCode() {
-    var cs = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", out = "";
-    while (out.length < 32) {
-      var b = new Uint8Array(48); crypto.getRandomValues(b);
-      for (var i = 0; i < b.length && out.length < 32; i++) if (b[i] < 248) out += cs[b[i] % 62]; // unbiased
-    }
-    return out;
-  }
-  $("pairGen").addEventListener("click", function () {
-    var code = genCode(), inp = $("pairInput");
-    save("trx:ntfyTopic", code); inp.value = code; flushPings();
-    function selectIt() { try { inp.focus(); inp.select(); inp.setSelectionRange(0, code.length); } catch (e) {} }
-    var msg = $("pairMsg");
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(code).then(function () { msg.textContent = "Paired \u2713 \u00b7 copied"; },
-          function () { selectIt(); msg.textContent = "Paired \u2713 \u00b7 hold to copy"; });
-        msg.textContent = "Paired \u2713 \u00b7 copied";
-      } else { selectIt(); msg.textContent = "Paired \u2713 \u00b7 hold to copy"; }
-    } catch (e) { selectIt(); msg.textContent = "Paired \u2713 \u00b7 hold to copy"; }
-  });
-  $("pairClose").addEventListener("click", closePair);
-  $("pair").addEventListener("click", function (e) { if (e.target === $("pair") && Date.now() - pairOpenedAt > 600) closePair(); });
 
   window.TRXAPP = { beep: beep, unlockAudio: unlockAudio, acquireWake: acquireWake, releaseWake: releaseWake, maybeReload: maybeReload };
   initDay();
