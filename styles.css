@@ -140,3 +140,6 @@ body {
   font: inherit; font-size: 18px; padding: 0 14px; -webkit-user-select: text; user-select: text; }
 #pair { z-index: 30; align-items: center; }
 .pairSheet { border: 2px solid var(--fg); border-radius: 22px; margin: 0 16px; }
+.pairInput { font-family: ui-monospace, Menlo, monospace; font-size: 15px; letter-spacing: 0; }
+.pairBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pairGen { background: var(--bg); color: var(--fg); border: 2px solid var(--fg); }

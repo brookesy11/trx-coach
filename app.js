@@ -468,6 +468,28 @@
   }
   longPress($("focus"), openPair); longPress($("finishFocus"), openPair);
   $("pairGo").addEventListener("click", doPair);
+  // Generate a fresh 32-char code on the phone, pair with it, and copy it for the bot.
+  function genCode() {
+    var cs = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", out = "";
+    while (out.length < 32) {
+      var b = new Uint8Array(48); crypto.getRandomValues(b);
+      for (var i = 0; i < b.length && out.length < 32; i++) if (b[i] < 248) out += cs[b[i] % 62]; // unbiased
+    }
+    return out;
+  }
+  $("pairGen").addEventListener("click", function () {
+    var code = genCode(), inp = $("pairInput");
+    save("trx:ntfyTopic", code); inp.value = code; flushPings();
+    function selectIt() { try { inp.focus(); inp.select(); inp.setSelectionRange(0, code.length); } catch (e) {} }
+    var msg = $("pairMsg");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function () { msg.textContent = "Paired \u2713 \u00b7 copied"; },
+          function () { selectIt(); msg.textContent = "Paired \u2713 \u00b7 hold to copy"; });
+        msg.textContent = "Paired \u2713 \u00b7 copied";
+      } else { selectIt(); msg.textContent = "Paired \u2713 \u00b7 hold to copy"; }
+    } catch (e) { selectIt(); msg.textContent = "Paired \u2713 \u00b7 hold to copy"; }
+  });
   $("pairClose").addEventListener("click", closePair);
   $("pair").addEventListener("click", function (e) { if (e.target === $("pair") && Date.now() - pairOpenedAt > 600) closePair(); });
 
