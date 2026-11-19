@@ -12,6 +12,28 @@
   function loadOv(k) { return load("trx:ov:" + k, null); }
   function saveOv(k, ov) { save("trx:ov:" + k, ov); }
 
+  // ---- One-time fresh start: tracking begins 2026-11-19 ----
+  // Runs on the first load on/after that date (so tonight's session is untouched): drops every on-device
+  // record dated before it (log, history/streak, done/closed/rating/progress, old swaps, unsent pings).
+  // Keeps the ntfy topic, timer settings and swaps for 2026-11-19 onward.
+  function freshStart() {
+    var CUT = "2026-11-19", FLAG = "trx:reset20261119";
+    if (T.dateKey(new Date()) < CUT || LS.getItem(FLAG)) return;
+    try {
+      var lg = load("trx:log", {}), keep = {};
+      Object.keys(lg || {}).forEach(function (k) { if (k >= CUT) keep[k] = lg[k]; });
+      save("trx:log", keep);
+      save("trx:history", load("trx:history", []).filter(function (k) { return k >= CUT; }));
+      var day = load("trx:day", null); if (day && (!day.key || day.key < CUT)) LS.removeItem("trx:day");
+      save("trx:pingq", load("trx:pingq", []).filter(function (b) { try { return JSON.parse(b).d >= CUT; } catch (e) { return false; } }));
+      var dated = /^trx:(pinged|rate|closed|ov):(\d{4}-\d{2}-\d{2})$/, rm = [];
+      for (var i = 0; i < LS.length; i++) { var k = LS.key(i), m = dated.exec(k || ""); if (m && m[2] < CUT) rm.push(k); }
+      rm.forEach(function (k) { LS.removeItem(k); });
+      LS.setItem(FLAG, String(Date.now()));
+    } catch (e) {}
+  }
+  freshStart();
+
   // ---- Completion ping (ntfy.sh): once per date, queued until a POST succeeds ----
   // The topic is never in the code: it lives only in this device's localStorage (trx:ntfyTopic), set when the phone was paired.
   var TOPIC_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -58,6 +80,7 @@
   function fresh() { return { key: plan.key, sig: plan.sig, idx: 0, left: S[0].secs, done: S.map(function () { return false; }), finished: false, startedAt: null }; }
 
   function initDay() {
+    freshStart(); // also covers an app left open across midnight into 2026-11-19
     todayKey = T.dateKey(new Date());
     plan = T.planFor(todayKey, loadOv(todayKey));
     S = plan.steps;
