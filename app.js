@@ -82,6 +82,10 @@
     setWake("");
   }
 
+  // ---- Deferred reload for app updates ----
+  var pendingReload = false;
+  function maybeReload() { if (pendingReload && !running) { persist(); window.location.reload(); } }
+
   // ---- Timer ----
   var running = false, timer = null, endAt = 0;
   function persist() { save("trx:day", st); }
@@ -110,6 +114,7 @@
   }
   function pause() {
     running = false; clearInterval(timer); releaseWake(); persist(); render();
+    maybeReload();
   }
   function goTo(i, markCurrent) {
     if (markCurrent) st.done[st.idx] = true;
@@ -130,10 +135,12 @@
       if (dn * 2 >= nr.length && hist.indexOf(plan.key) === -1) { hist.push(plan.key); save("trx:history", hist); }
     }
     persist(); render();
+    maybeReload();
   }
   function reset() {
     running = false; clearInterval(timer); releaseWake();
     st = fresh(); persist(); render();
+    maybeReload();
   }
 
   // ---- Streak ----
@@ -158,9 +165,6 @@
   function render() {
     var s = S[st.idx];
     $("focus").textContent = plan.focus;
-    $("date").textContent = fmtDate(plan.key);
-    $("section").textContent = s.label;
-    $("setLbl").textContent = s.kind === "rest" ? "Rest" : setText(s);
     var nr = nonRest(), doneCount = nr.filter(function (i) { return st.done[i]; }).length;
     var elapsed = 0; for (var i = 0; i < st.idx; i++) elapsed += S[i].secs; elapsed += s.secs - st.left;
     $("barFill").style.width = (st.finished ? 100 : Math.min(100, elapsed / plan.total * 100)) + "%";
@@ -168,7 +172,8 @@
     $("name").textContent = s.name;
     var nx = s.kind === "rest" ? nextWork(st.idx) : S[st.idx + 1];
     if (nx && nx.kind === "rest") nx = nextWork(st.idx);
-    $("next").textContent = nx ? nx.name + (nx.kind === "work" ? " \u00b7 " + setText(nx) : "") : "Finish";
+    var curName = s.kind === "rest" ? null : s.name;
+    $("next").textContent = !nx ? "Finish" : (nx.kind === "work" && (nx.name === curName || (s.kind === "rest" && nx.set > 1)) ? "Set " + nx.set : nx.name);
     document.querySelector(".stage").classList.toggle("rest", s.kind === "rest");
     var sb = $("startBtn");
     sb.textContent = running ? "Pause" : (st.idx > 0 || st.left < s.secs ? "Resume" : "Start");
@@ -255,6 +260,7 @@
       else tick();
     } else {
       persist();
+      maybeReload();
     }
   });
   window.addEventListener("pagehide", persist);
@@ -264,7 +270,8 @@
   if ("serviceWorker" in navigator) {
     var hadController = !!navigator.serviceWorker.controller, reloaded = false;
     navigator.serviceWorker.addEventListener("controllerchange", function () {
-      if (hadController && !reloaded) { reloaded = true; window.location.reload(); }
+      // Never interrupt a running set: reload now if idle, otherwise as soon as the timer stops.
+      if (hadController && !reloaded) { reloaded = true; pendingReload = true; maybeReload(); }
     });
     window.addEventListener("load", function () {
       navigator.serviceWorker.register("sw.js", { scope: "./", updateViaCache: "none" }).then(function (reg) {
