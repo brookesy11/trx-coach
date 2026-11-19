@@ -22,7 +22,7 @@
     if (saved && saved.key === plan.key && saved.sig === plan.sig && saved.done && saved.done.length === S.length) st = saved;
     else st = fresh();
     running = false;
-    renderList(); render();
+    renderChips(); render();
   }
 
   // ---- Audio (Web Audio, unlocked on first tap for iOS) ----
@@ -55,12 +55,12 @@
 
   // ---- Keep screen awake ----
   var wakeLock = null, video = $("nosleep"), wakeMode = "";
-  function setWake(msg) { $("wake").textContent = msg; }
+  function setWake(msg) { var w = $("wake"); w.textContent = msg; w.hidden = !msg; }
   function acquireWake() {
     if ("wakeLock" in navigator) {
       navigator.wakeLock.request("screen").then(function (l) {
         wakeLock = l; wakeMode = "native";
-        setWake("Screen will stay on while the timer runs.");
+        setWake("");
         l.addEventListener("release", function () { if (wakeLock === l) wakeLock = null; });
       }).catch(function () { startVideo(); });
     } else startVideo();
@@ -70,10 +70,10 @@
       video.muted = true; video.setAttribute("playsinline", ""); video.setAttribute("muted", "");
       var p = video.play();
       wakeMode = "video";
-      if (p && p.then) p.then(function () { setWake("Screen will stay on while the timer runs."); })
-        .catch(function () { wakeMode = ""; setWake("Can't keep the screen awake here. Set Auto-Lock to Never during your workout."); });
-      else setWake("Screen will stay on while the timer runs.");
-    } catch (e) { setWake("Can't keep the screen awake here. Set Auto-Lock to Never during your workout."); }
+      if (p && p.then) p.then(function () { setWake(""); })
+        .catch(function () { wakeMode = ""; setWake("Screen may sleep. Set Auto-Lock to Never."); });
+      else setWake("");
+    } catch (e) { setWake("Screen may sleep. Set Auto-Lock to Never."); }
   }
   function releaseWake() {
     if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
@@ -151,57 +151,91 @@
   function fmtDate(k) { return T.parseKey(k).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }); }
   function nonRest() { var a = []; S.forEach(function (s, i) { if (s.kind !== "rest") a.push(i); }); return a; }
 
+  function nextWork(i) { for (var j = i + 1; j < S.length; j++) if (S[j].kind !== "rest") return S[j]; return null; }
+  function infoStep() { var s = S[st.idx]; return s.kind === "rest" ? (nextWork(st.idx) || s) : s; }
+  function setText(s) { return s.kind === "warm" ? s.set + " of " + s.sets : "Set " + s.set + " of " + s.sets; }
+
   function render() {
     var s = S[st.idx];
-    $("focus").textContent = plan.focus + " \u00b7 Day " + plan.dayOfCycle + " of 4";
+    $("focus").textContent = plan.focus;
     $("date").textContent = fmtDate(plan.key);
     $("section").textContent = s.label;
+    $("setLbl").textContent = s.kind === "rest" ? "Rest" : setText(s);
     var nr = nonRest(), doneCount = nr.filter(function (i) { return st.done[i]; }).length;
-    $("count").textContent = doneCount + "/" + nr.length + " done";
     var elapsed = 0; for (var i = 0; i < st.idx; i++) elapsed += S[i].secs; elapsed += s.secs - st.left;
     $("barFill").style.width = (st.finished ? 100 : Math.min(100, elapsed / plan.total * 100)) + "%";
     $("clock").textContent = fmt(st.left);
     $("name").textContent = s.name;
-    $("cue").textContent = s.cue;
-    var nx = S[st.idx + 1];
-    $("next").textContent = nx ? (nx.kind === "rest" ? "Rest " + nx.secs + "s" : nx.name) : "Finish";
+    var nx = s.kind === "rest" ? nextWork(st.idx) : S[st.idx + 1];
+    if (nx && nx.kind === "rest") nx = nextWork(st.idx);
+    $("next").textContent = nx ? nx.name + (nx.kind === "work" ? " \u00b7 " + setText(nx) : "") : "Finish";
     document.querySelector(".stage").classList.toggle("rest", s.kind === "rest");
     var sb = $("startBtn");
     sb.textContent = running ? "Pause" : (st.idx > 0 || st.left < s.secs ? "Resume" : "Start");
     sb.className = "btn " + (running ? "outline" : "solid");
-    // list
-    var items = $("list").children;
-    for (var j = 0; j < items.length; j++) {
-      var li = items[j], idx = +li.dataset.idx;
-      li.className = (st.done[idx] ? "done " : "") + (idx === st.idx ? "cur" : "");
-      li.querySelector(".chk").textContent = st.done[idx] ? "\u2713" : "";
+    // chips
+    var curEx = s.ex;
+    var chips = $("chips").children;
+    for (var c = 0; c < chips.length; c++) {
+      var ch = chips[c], ex = +ch.dataset.ex, all = true;
+      var ticks = ch.querySelectorAll("i"), k = 0;
+      S.forEach(function (x, xi) { if (x.kind !== "rest" && x.ex === ex) { ticks[k].className = st.done[xi] ? "on" : ""; if (!st.done[xi]) all = false; k++; } });
+      ch.className = "chip" + (ex === curEx ? " cur" : "") + (all ? " done" : "");
     }
+    $("chipName").textContent = curEx < 0 ? "Warm-up" : (curEx + 1) + ". " + plan.moves[curEx];
+    if (!$("howto").hidden) $("hClock").textContent = (s.kind === "rest" ? "Rest " : "") + fmt(st.left);
     // finish
     var fin = $("finish");
     if (st.finished) {
       fin.hidden = false;
       $("finishFocus").textContent = plan.focus + " \u00b7 " + fmtDate(plan.key);
-      $("finishStat").textContent = doneCount + " of " + nr.length + " moves \u00b7 " + Math.round(plan.total / 60) + " min";
+      $("finishStat").textContent = doneCount + " of " + nr.length + " sets \u00b7 " + Math.round(plan.total / 60) + " min";
       var sk = streak();
-      $("finishStreak").textContent = sk.streak > 1 ? sk.streak + "-day streak \u00b7 " + sk.total + " sessions total" : (sk.total ? sk.total + (sk.total === 1 ? " session" : " sessions") + " completed" : "Finish at least half the moves to start a streak");
+      $("finishStreak").textContent = sk.streak > 1 ? sk.streak + "-day streak" : (sk.total ? sk.total + (sk.total === 1 ? " session" : " sessions") : "");
       var tm = new Date(T.parseKey(plan.key).getTime()); tm.setDate(tm.getDate() + 1);
       $("finishTomorrow").textContent = "Tomorrow: " + T.planFor(T.dateKey(tm)).focus;
     } else fin.hidden = true;
   }
 
-  function renderList() {
-    var ol = $("list"); ol.innerHTML = "";
-    S.forEach(function (s, i) {
-      if (s.kind === "rest") return;
-      var li = document.createElement("li"); li.dataset.idx = i;
-      var b = document.createElement("button"); b.type = "button";
-      b.innerHTML = '<span class="chk" aria-hidden="true"></span><span class="nm"></span><span class="tag"></span>';
-      b.querySelector(".nm").textContent = s.name;
-      b.querySelector(".tag").textContent = (s.kind === "work" ? s.label.replace(/ of \d+/, "") : s.label) + " \u00b7 " + s.secs + "s";
-      b.addEventListener("click", function () { goTo(i, false); window.scrollTo({ top: 0, behavior: "smooth" }); });
-      li.appendChild(b); ol.appendChild(li);
+  function jumpToEx(ex) {
+    var first = -1, open = -1;
+    S.forEach(function (x, i) { if (x.kind !== "rest" && x.ex === ex) { if (first < 0) first = i; if (open < 0 && !st.done[i]) open = i; } });
+    goTo(open >= 0 ? open : first, false);
+  }
+
+  function renderChips() {
+    var nav = $("chips"); nav.innerHTML = "";
+    var groups = [{ ex: -1, n: "W", label: "Warm-up" }].concat(plan.moves.map(function (m, i) { return { ex: i, n: String(i + 1), label: m }; }));
+    groups.forEach(function (g) {
+      var count = S.filter(function (x) { return x.kind !== "rest" && x.ex === g.ex; }).length;
+      var b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.dataset.ex = g.ex;
+      b.setAttribute("aria-label", g.label);
+      b.innerHTML = '<span class="n"></span><span class="ticks">' + new Array(count + 1).join("<i></i>") + "</span>";
+      b.querySelector(".n").textContent = g.n;
+      b.addEventListener("click", function () { jumpToEx(g.ex); });
+      nav.appendChild(b);
     });
   }
+
+  // ---- How-to popup (timer keeps running; the sheet shows the live countdown) ----
+  function openHowto() {
+    var s = infoStep(), h = (window.HOWTO || {})[s.name];
+    $("hName").textContent = s.name;
+    $("hSetup").textContent = h ? h.setup : s.cue;
+    var ol = $("hSteps"); ol.innerHTML = "";
+    (h ? h.steps : []).forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ol.appendChild(li); });
+    $("hAvoid").textContent = h ? h.avoid : "";
+    $("hEasier").textContent = h ? h.easier : "";
+    $("hHarder").textContent = h ? h.harder : "";
+    $("howto").hidden = false;
+    $("howto").querySelector(".sheet").scrollTop = 0;
+    render();
+  }
+  function closeHowto() { $("howto").hidden = true; }
+  $("infoBtn").addEventListener("click", openHowto);
+  $("hClose").addEventListener("click", closeHowto);
+  $("howto").addEventListener("click", function (e) { if (e.target === $("howto")) closeHowto(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeHowto(); });
 
   // ---- Buttons ----
   $("startBtn").addEventListener("click", function () { running ? pause() : play(); });

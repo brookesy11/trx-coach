@@ -1,6 +1,6 @@
 /* TRX Coach - deterministic daily workout generator. No network, no daily updates.
    4-day cycle: Push, Pull, Legs, Full body, repeating on a continuous local-day count.
-   Anchor: Wed 2026-11-18 = Push. Each session: 1-min warm-up + a 5-move circuit x 3 sets
+   Anchor: Wed 2026-11-18 = Push. Each session: 1-min warm-up + 5 moves x 3 straight sets
    (4 focus moves + 1 abs move), 45s work / 15s rest. */
 (function (root) {
   "use strict";
@@ -11,7 +11,7 @@
   // Each focus = 4 slots. Each slot lists options as [weight, name, cue].
   // Higher weight = more common / better-regarded in the research, so it appears more often.
   var DAYS = [
-    { key: "push", title: "Push", warm: ["Arm circles", "Wall-angel reach"], slots: [
+    { key: "push", title: "Push", warm: ["Arm circles", "Overhead reach"], slots: [
       [[3, "TRX chest press", "Face away, body in a plank, lower chest to hands, press out."],
        [1, "Staggered chest press", "One foot forward, press out, switch feet each set."]],
       [[2, "TRX push-up", "Feet in cradles, body rigid, lower chest to floor. Knees down is fine."],
@@ -70,7 +70,7 @@
 
   var WARM = {
     "Arm circles": "Big, slow circles both directions.",
-    "Wall-angel reach": "Hold the straps, reach overhead and down, open the chest.",
+    "Overhead reach": "Hold the straps, reach overhead and down, open the chest.",
     "Light rows": "Stand nearly upright, easy smooth rows.",
     "Assisted squats": "Hold the straps, sit back, stand tall.",
     "Leg swings": "Hold a strap, swing front to back. Switch legs halfway."
@@ -111,21 +111,21 @@
     var ab = ABS[mod(info.n, ABS.length)];
     moves.push({ name: ab[0], cue: ab[1], abs: true });
 
-    var steps = [];
-    day.warm.forEach(function (w) { steps.push({ name: w, cue: WARM[w], secs: 30, kind: "warm", label: "Warm-up" }); });
-    for (var s = 1; s <= SETS; s++) {
-      moves.forEach(function (m, k) {
-        steps.push({ name: m.name, cue: m.cue, secs: WORK, kind: "work", label: "Set " + s + " of " + SETS });
-        var last = s === SETS && k === moves.length - 1;
-        if (last) return;
-        if (k < moves.length - 1) steps.push({ name: "Rest", cue: "Next: " + moves[k + 1].name, secs: REST, kind: "rest", label: "Set " + s + " of " + SETS });
-        else steps.push({ name: "Rest", cue: "Set " + (s + 1) + " next: " + moves[0].name, secs: REST, kind: "rest", label: "Between sets" });
-      });
-    }
+    // Straight sets: all sets of one exercise, then the next. Warm-up first.
+    var steps = [], nW = day.warm.length;
+    day.warm.forEach(function (w, i) { steps.push({ name: w, cue: WARM[w], secs: 30, kind: "warm", label: "Warm-up", ex: -1, set: i + 1, sets: nW }); });
+    moves.forEach(function (m, k) {
+      var exLabel = "Exercise " + (k + 1) + " of " + moves.length;
+      for (var s = 1; s <= SETS; s++) {
+        steps.push({ name: m.name, cue: m.cue, secs: WORK, kind: "work", label: exLabel, ex: k, set: s, sets: SETS });
+        if (s < SETS) steps.push({ name: "Rest", cue: "", secs: REST, kind: "rest", label: exLabel, ex: k, set: s + 1, sets: SETS });
+        else if (k < moves.length - 1) steps.push({ name: "Rest", cue: "", secs: REST, kind: "rest", label: "Exercise " + (k + 2) + " of " + moves.length, ex: k + 1, set: 1, sets: SETS });
+      }
+    });
     var total = steps.reduce(function (a, x) { return a + x.secs; }, 0);
     return {
       key: key, focus: day.title, focusKey: day.key, dayOfCycle: info.type + 1,
-      moves: moves.map(function (m) { return m.name; }), steps: steps, total: total,
+      moves: moves.map(function (m) { return m.name; }), warm: day.warm, steps: steps, total: total,
       sig: hash(steps.map(function (x) { return x.name + x.secs; }).join("|"))
     };
   }

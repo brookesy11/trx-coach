@@ -19,15 +19,17 @@
   <div class="meta"><span id="focus">Workout</span><span id="date"></span></div>
   <header class="top">
     <span id="section">Warm-up</span>
-    <span id="count">0/0 done</span>
+    <span id="setLbl"></span>
   </header>
   <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
 
   <section class="stage" aria-live="polite">
     <div id="clock" class="clock">0:30</div>
-    <h1 id="name">Loading</h1>
-    <p id="cue" class="cue"></p>
-    <p class="next"><span>Up next</span> <b id="next">-</b></p>
+    <div class="nameRow">
+      <h1 id="name">Loading</h1>
+      <button id="infoBtn" class="info" type="button" aria-label="How to do this exercise">?</button>
+    </div>
+    <p class="next"><span>Next</span> <b id="next">-</b></p>
   </section>
 
   <div class="primary">
@@ -40,11 +42,26 @@
     <button id="skipBtn" class="btn small" aria-label="Skip">Skip</button>
     <button id="resetBtn" class="btn small" aria-label="Reset">Reset</button>
   </div>
-  <p id="wake" class="wake"></p>
+  <p id="wake" class="wake" hidden></p>
 
-  <h2 class="listHead">Today's moves</h2>
-  <ol id="list" class="list"></ol>
+  <nav id="chips" class="chips" aria-label="Today's exercises"></nav>
+  <p id="chipName" class="chipName"></p>
 </main>
+
+<div id="howto" class="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hName">
+    <div class="sheetTop">
+      <span id="hClock" class="hClock"></span>
+      <button id="hClose" class="x" type="button" aria-label="Close">&times;</button>
+    </div>
+    <h2 id="hName"></h2>
+    <p id="hSetup" class="hSetup"></p>
+    <ol id="hSteps" class="hSteps"></ol>
+    <p class="hRow"><b>Avoid</b><span id="hAvoid"></span></p>
+    <p class="hRow"><b>Easier</b><span id="hEasier"></span></p>
+    <p class="hRow"><b>Harder</b><span id="hHarder"></span></p>
+  </div>
+</div>
 
 <section id="finish" class="finish" hidden>
   <div class="finishInner">
@@ -62,6 +79,7 @@
 </video>
 
 <script src="workouts.js"></script>
+<script src="howto.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

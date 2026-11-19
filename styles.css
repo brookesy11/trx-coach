@@ -17,14 +17,13 @@ body {
 .meta { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; color: var(--dim); font-weight: 600; letter-spacing: .02em; }
 .meta #focus { color: var(--fg); }
 .top { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px; font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.top #count { font-size: 16px; color: var(--dim); font-weight: 700; text-transform: none; letter-spacing: 0; }
+.top #setLbl { font-size: 16px; color: var(--dim); font-weight: 700; text-transform: none; letter-spacing: 0; }
 .bar { height: 8px; border: 2px solid var(--line); border-radius: 6px; margin-top: 12px; overflow: hidden; }
 #barFill { height: 100%; width: 0; background: var(--fg); transition: width .4s linear; }
 .stage { text-align: center; padding: 18px 0 10px; }
 .clock { font-size: clamp(96px, 34vw, 190px); line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.04em; }
 .stage.rest .clock { color: var(--dim); }
 .stage h1 { font-size: 34px; line-height: 1.1; margin: 12px 0 6px; font-weight: 800; }
-.cue { font-size: 18px; line-height: 1.35; margin: 0 auto; max-width: 30ch; color: var(--fg); min-height: 2.7em; }
 .next { margin: 12px 0 0; font-size: 17px; color: var(--dim); }
 .next b { color: var(--fg); font-weight: 700; }
 .btn {
@@ -39,20 +38,11 @@ body {
 .secondary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
 .btn.small { min-height: 56px; font-size: 17px; border-width: 2px; border-radius: 14px; padding: 0 4px; }
 .btn.wide { width: 100%; min-height: 70px; font-size: 22px; margin-top: 28px; }
-.wake { text-align: center; font-size: 13px; color: var(--dim); min-height: 1.3em; margin: 12px 0 0; }
-.listHead { font-size: 15px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 26px 0 6px; }
-.list { list-style: none; margin: 0; padding: 0; border-top: 1px solid #333; }
-.list li { border-bottom: 1px solid #333; }
-.list button {
+.wake { text-align: center; font-size: 12px; color: var(--dim); margin: 10px 0 0; }
+.wake[hidden] { display: none; }
   width: 100%; display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 8px 4px;
   background: none; border: 0; color: var(--fg); font: inherit; font-size: 17px; text-align: left; cursor: pointer;
 }
-.list .chk { flex: 0 0 28px; height: 28px; border: 2px solid var(--fg); border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 900; }
-.list .done .chk { background: var(--fg); color: var(--bg); }
-.list .done .nm { color: var(--dim); text-decoration: line-through; }
-.list .cur .nm { font-weight: 800; }
-.list .cur .chk { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--fg); }
-.list .tag { margin-left: auto; font-size: 13px; color: var(--dim); white-space: nowrap; }
 .finish { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 10;
   padding: calc(var(--sat) + 20px) calc(var(--sar) + 24px) calc(var(--sab) + 20px) calc(var(--sal) + 24px); }
 .finish[hidden] { display: none; }
@@ -64,3 +54,33 @@ body {
 .finishTomorrow { font-size: 15px; color: var(--dim); margin: 6px 0 0; }
 #nosleep { position: fixed; width: 1px; height: 1px; opacity: 0.01; left: -10px; bottom: 0; pointer-events: none; }
 @media (max-height: 700px) { .clock { font-size: clamp(80px, 28vw, 150px); } .stage h1 { font-size: 28px; } }
+
+.nameRow { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 12px 0 0; }
+.nameRow h1 { margin: 0; }
+.info { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--fg); background: var(--bg); color: var(--fg);
+  font: inherit; font-size: 19px; font-weight: 800; line-height: 1; cursor: pointer; padding: 0; position: relative; }
+.info::after { content: ""; position: absolute; inset: -8px; } /* bigger tap target */
+.chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 26px; }
+.chip { min-height: 58px; border: 2px solid var(--fg); border-radius: 14px; background: var(--bg); color: var(--fg); font: inherit;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; cursor: pointer; padding: 0; }
+.chip .n { font-size: 18px; font-weight: 800; line-height: 1; }
+.chip .ticks { display: flex; gap: 4px; }
+.chip .ticks i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; display: block; }
+.chip .ticks i.on { background: currentColor; }
+.chip.cur { background: var(--fg); color: var(--bg); }
+.chip.done:not(.cur) { border-color: #555; color: #777; }
+.chipName { text-align: center; font-size: 14px; color: var(--dim); margin: 10px 0 0; min-height: 1.2em; }
+.modal { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.72); display: flex; align-items: flex-end; justify-content: center; }
+.modal[hidden] { display: none; }
+.sheet { width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; background: var(--bg); color: var(--fg);
+  border-top: 2px solid var(--fg); border-radius: 22px 22px 0 0;
+  padding: 14px calc(var(--sar) + 22px) calc(var(--sab) + 24px) calc(var(--sal) + 22px); }
+.sheetTop { display: flex; justify-content: space-between; align-items: center; }
+.hClock { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--dim); }
+.x { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--fg); background: var(--bg); color: var(--fg); font-size: 26px; line-height: 1; cursor: pointer; padding: 0; }
+.sheet h2 { font-size: 28px; margin: 6px 0 8px; font-weight: 800; }
+.hSetup { font-size: 17px; line-height: 1.4; margin: 0 0 12px; color: var(--dim); }
+.hSteps { margin: 0 0 14px; padding-left: 22px; font-size: 18px; line-height: 1.4; }
+.hSteps li { margin: 0 0 6px; }
+.hRow { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-size: 16px; line-height: 1.4; margin: 0; padding: 10px 0; border-top: 1px solid #333; }
+.hRow b { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
