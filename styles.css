@@ -16,8 +16,10 @@ body {
   padding: calc(var(--sat) + 10px) calc(var(--sar) + 16px) calc(var(--sab) + 14px) calc(var(--sal) + 16px);
   touch-action: pan-y; /* horizontal swipes are handled by the app, not the browser */
 }
-.topRow { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
-.focus { font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.topRow { flex: 0 0 auto; text-align: center; }
+.barRow { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.spacer { flex: 0 0 40px; }
+.focus { font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
 .bar { flex: 1; height: 10px; border: 2px solid var(--fg); border-radius: 6px; overflow: hidden; }
 #barFill { height: 100%; width: 0; background: var(--fg); transition: width .4s linear; }
 .play { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--fg); background: var(--bg); color: var(--fg);
@@ -37,11 +39,9 @@ body {
 .clock.long { font-size: min(38vw, 30vh, 260px); }
 .stage.paused .clock { opacity: .55; }
 .nameRow { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 2vh 0 0; }
-.name { margin: 0; font-weight: 800; line-height: 1.05; font-size: 48px; max-width: calc(100% - 64px); overflow-wrap: break-word; }
-.info { flex: 0 0 auto; width: 48px; height: 48px; border-radius: 50%; border: 3px solid var(--fg); background: var(--bg); color: var(--fg);
+.name { margin: 0; font-weight: 800; line-height: 1.05; font-size: 48px; max-width: 100%; overflow-wrap: break-word; cursor: pointer; }
   font: inherit; font-size: 26px; font-weight: 900; line-height: 1; cursor: pointer; padding: 0; position: relative; touch-action: manipulation; }
-.info::after { content: ""; position: absolute; inset: -10px; }
-.next { margin: 1.6vh 0 0; font-size: clamp(18px, 5.6vw, 26px); color: var(--dim); }
+.next { cursor: pointer; margin: 1.6vh 0 0; font-size: clamp(18px, 5.6vw, 26px); color: var(--dim); }
 .next b { color: var(--fg); font-weight: 800; }
 .plus { margin-top: 2.2vh; min-width: 150px; min-height: 60px; padding: 0 26px; font: inherit; font-size: 26px; font-weight: 800;
   border: 3px solid var(--fg); border-radius: 30px; background: var(--bg); color: var(--fg); cursor: pointer; touch-action: manipulation; }

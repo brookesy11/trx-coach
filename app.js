@@ -226,6 +226,7 @@
     });
   }
 
+  var lastSwipe = 0;
   // ---- How-to popup (timer keeps running; the sheet shows the live countdown) ----
   function openHowto() {
     var s = infoStep(), h = (window.HOWTO || {})[s.name];
@@ -241,7 +242,10 @@
     render();
   }
   function closeHowto() { $("howto").hidden = true; }
-  $("infoBtn").addEventListener("click", openHowto);
+  function tapHowto() { if (Date.now() - lastSwipe > 400) openHowto(); }
+  $("name").addEventListener("click", tapHowto);
+  $("nextLine").addEventListener("click", tapHowto);
+  $("name").addEventListener("keydown", function (e) { if (e.key === "Enter") openHowto(); });
   $("hClose").addEventListener("click", closeHowto);
   $("howto").addEventListener("click", function (e) { if (e.target === $("howto")) closeHowto(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeHowto(); });
@@ -291,7 +295,7 @@
   }
 
   // Swipe: >= 50px horizontal and clearly more horizontal than vertical.
-  var tx = 0, ty = 0, tracking = false, horiz = false, lastSwipe = 0;
+  var tx = 0, ty = 0, tracking = false, horiz = false;
   function onStart(e) {
     if (!$("howto").hidden || e.touches.length > 1 || animating) { tracking = false; return; }
     tracking = true; horiz = false; tx = e.touches[0].clientX; ty = e.touches[0].clientY;

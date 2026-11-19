@@ -17,22 +17,24 @@
 <body>
 <main id="app">
   <div class="topRow">
-    <span id="focus" class="focus">Workout</span>
-    <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
+    <div id="focus" class="focus">Workout</div>
+    <div class="barRow">
+      <span class="spacer" aria-hidden="true"></span>
+      <div class="bar" aria-hidden="true"><div id="barFill"></div></div>
     <button id="playBtn" class="play" type="button" aria-label="Start">
       <svg class="icoPlay" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>
       <svg class="icoPause" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4.5" width="4.5" height="15" rx="1" fill="currentColor"/><rect x="14" y="4.5" width="4.5" height="15" rx="1" fill="currentColor"/></svg>
     </button>
+    </div>
   </div>
 
   <section id="stage" class="stage" aria-live="polite">
     <div id="stageInner" class="stageInner">
       <div id="clock" class="clock" role="button" aria-label="Tap to start or pause">0:30</div>
       <div class="nameRow">
-        <h1 id="name" class="name">Loading</h1>
-        <button id="infoBtn" class="info" type="button" aria-label="How to do this exercise">?</button>
+        <h1 id="name" class="name" role="button" tabindex="0" aria-label="Show how to do this exercise">Loading</h1>
       </div>
-      <p class="next"><span>Next</span> <b id="next">-</b></p>
+      <p id="nextLine" class="next"><span>Next</span> <b id="next">-</b></p>
       <button id="plusBtn" class="plus" type="button" hidden>+15s</button>
     </div>
   </section>
