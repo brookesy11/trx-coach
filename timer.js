@@ -79,6 +79,7 @@
     left = l;
     if (l > 0 && l <= 3) { var b = A().beep; if (b) b(880, 0.12, 0.3); }
     if (l === 0) {
+      if (A().flash) A().flash();
       if (pi + 1 >= ph.length) {
         running = false; clearInterval(timer); done = true; remMs = 0; cue("end");
         var app = A(); if (app.releaseWake) app.releaseWake(); if (app.maybeReload) app.maybeReload(); render(); return;

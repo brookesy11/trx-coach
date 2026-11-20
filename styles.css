@@ -40,9 +40,10 @@ body {
 .stage.paused .clock { opacity: .55; }
 .nameRow { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 2vh 0 0; }
 .name { margin: 0; font-weight: 800; line-height: 1.05; font-size: 48px; max-width: 100%; overflow-wrap: break-word; cursor: pointer; }
-  font: inherit; font-size: 26px; font-weight: 900; line-height: 1; cursor: pointer; padding: 0; position: relative; touch-action: manipulation; }
-.next { cursor: pointer; margin: 1.6vh 0 0; font-size: clamp(18px, 5.6vw, 26px); color: var(--dim); }
-.next b { color: var(--fg); font-weight: 800; }
+.next { cursor: pointer; margin: 1.8vh 0 0; font-size: clamp(24px, 7.4vw, 34px); line-height: 1.15; color: #cfcfcf; font-weight: 700; }
+.next b { color: var(--fg); font-weight: 900; }
+.stage.rest .next { margin-top: 2.6vh; font-size: clamp(30px, 9.6vw, 50px); }
+.stage.rest .next span { display: block; font-size: 15px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #cfcfcf; margin-bottom: 4px; }
 .plus { margin-top: 2.2vh; min-width: 150px; min-height: 60px; padding: 0 26px; font: inherit; font-size: 26px; font-weight: 800;
   border: 3px solid var(--fg); border-radius: 30px; background: var(--bg); color: var(--fg); cursor: pointer; touch-action: manipulation; }
 .plus[hidden] { display: none; }
@@ -178,3 +179,9 @@ body {
 @media (max-height: 700px) { .hTimer { min-height: 56px; } .cal { margin-top: 2.6vh; } }
 @media (max-height: 700px) { .finishedBtn { margin-top: 12px; min-height: 54px; font-size: 22px; } }
 @media (max-height: 700px) { .finishTime { font-size: min(26vw, 14vh, 150px); } .finishStreak { margin-top: 2px; font-size: 14px; } .tmrList li { min-height: 44px; } }
+.rate[hidden] { display: none; }
+
+/* End-of-interval cue: the whole screen inverts twice (150ms on / 150ms off x2, 0.6s total). Kept under reduced motion: it is a cue. */
+.flash { position: fixed; inset: 0; z-index: 100; background: #fff; mix-blend-mode: difference; pointer-events: none; opacity: 0; }
+.flash.go { animation: flash2 .6s steps(1, end) 1 both; }
+@keyframes flash2 { 0% { opacity: 1; } 25% { opacity: 0; } 50% { opacity: 1; } 75% { opacity: 0; } 100% { opacity: 0; } }

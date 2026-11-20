@@ -34,14 +34,32 @@
   }
   freshStart();
 
+  // ---- 10-minute rule: one-time cleanup of short "finishes" already on the device ----
+  var MIN_SEC = 600;
+  (function clean10min() {
+    var FLAG = "trx:clean10min";
+    if (LS.getItem(FLAG)) return;
+    try {
+      var lg = load("trx:log", {}) || {}, bad = Object.keys(lg).filter(function (k) { return !(lg[k] && lg[k].sec >= MIN_SEC); });
+      bad.forEach(function (k) { delete lg[k]; });
+      save("trx:log", lg);
+      save("trx:history", load("trx:history", []).filter(function (k) { return bad.indexOf(k) === -1; }));
+      LS.setItem(FLAG, String(Date.now()));
+    } catch (e) {}
+  })();
+
   // ---- Completion ping (ntfy.sh): once per date, queued until a POST succeeds ----
   // The topic is never in the code: it lives only in this device's localStorage (trx:ntfyTopic), set when the phone was paired.
   var TOPIC_RE = /^[A-Za-z0-9_-]{16,64}$/;
   function pingTopic() { var t = load("trx:ntfyTopic", ""); return TOPIC_RE.test(t) ? t : ""; }
+  // Done ping: sent for every counted finish (>= 10 min), even if an earlier finish for the same date
+  // already pinged (e.g. an accidental short one before a Redo). An older unsent done ping for that date
+  // is replaced. trx:pinged:DATE now records the longest seconds sent.
   function queuePing(dateKey, body) {
-    if (load("trx:pinged:" + dateKey, false)) return;
-    save("trx:pinged:" + dateKey, true);
-    var q = load("trx:pingq", []); q.push(body); save("trx:pingq", q);
+    var q = load("trx:pingq", []);
+    q = q.filter(function (b, i) { if (flushing && i === 0) return true; try { var j = JSON.parse(b); return !(j.d === dateKey && !/rate$/.test(j.t)); } catch (e) { return true; } });
+    q.push(body); save("trx:pingq", q);
+    try { var sec = JSON.parse(body).sec || 0, prev = load("trx:pinged:" + dateKey, 0); save("trx:pinged:" + dateKey, Math.max(sec, +prev || 0)); } catch (e) {}
     flushPings();
   }
   var flushing = false;
@@ -112,6 +130,13 @@
       o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + (dur || 0.15) + 0.02);
     } catch (e) {}
   }
+  // Visual cue when a countdown hits zero: invert the whole screen twice (0.6s).
+  var flashEl = null;
+  function flash() {
+    flashEl = flashEl || $("flash"); if (!flashEl) return;
+    flashEl.classList.remove("go"); void flashEl.offsetWidth; flashEl.classList.add("go");
+    clearTimeout(flash.t); flash.t = setTimeout(function () { flashEl.classList.remove("go"); }, 650);
+  }
   function transitionBeep(toKind) {
     if (toKind === "rest") { beep(660, 0.35, 0.3); }
     else { beep(1046, 0.18, 0.35); setTimeout(function () { beep(1318, 0.3, 0.35); }, 180); }
@@ -170,7 +195,7 @@
     if (left !== st.left) {
       st.left = left;
       if (left > 0 && left <= 3) beep(880, 0.12, 0.3);
-      if (left === 0) { goTo(st.idx + 1, true); return; }
+      if (left === 0) { flash(); goTo(st.idx + 1, true); return; }
       persist(); render();
     }
   }
@@ -198,22 +223,25 @@
     if (!st.finished) {
       st.finished = true;
       st.finishedAt = Date.now();
-      try {
+      var secs = st.startedAt ? Math.round((st.finishedAt - st.startedAt) / 1000) : 0, counted = secs >= MIN_SEC;
+      // 10-minute rule (same as the box): shorter finishes are not logged and send no done ping.
+      if (counted) try {
         var tag = load("trx:pingPrefix", "") || "done"; // tests set "test" so the bot ignores them
-        queuePing(plan.key, JSON.stringify({ t: tag, d: plan.key, type: plan.focus.toUpperCase(),
-          sec: st.startedAt ? Math.round((st.finishedAt - st.startedAt) / 1000) : 0, ex: plan.moves }));
+        queuePing(plan.key, JSON.stringify({ t: tag, d: plan.key, type: plan.focus.toUpperCase(), sec: secs, ex: plan.moves }));
       } catch (e) {}
       beep(784, 0.2, 0.35); setTimeout(function () { beep(1046, 0.2, 0.35); }, 200); setTimeout(function () { beep(1318, 0.45, 0.35); }, 400);
       var nr = nonRest(), dn = nr.filter(function (i) { return st.done[i]; }).length;
       var hist = load("trx:history", []);
       // Count toward the streak only if at least half the moves were done.
-      if (dn * 2 >= nr.length && hist.indexOf(plan.key) === -1) { hist.push(plan.key); save("trx:history", hist); }
-      // On-device completion log (source for Home): { date: { type, sec, r } }.
-      if (dn * 2 >= nr.length) {
-        var lg = load("trx:log", {}), rt = load("trx:rate:" + plan.key, 0);
-        lg[plan.key] = { type: plan.focus, sec: st.startedAt ? Math.round((st.finishedAt - st.startedAt) / 1000) : 0 };
-        if (rt) lg[plan.key].r = rt;
-        save("trx:log", lg);
+      if (counted && dn * 2 >= nr.length && hist.indexOf(plan.key) === -1) { hist.push(plan.key); save("trx:history", hist); }
+      // On-device completion log (source for Home): { date: { type, sec, r } }. Keeps the longer finish (ties: latest).
+      if (counted && dn * 2 >= nr.length) {
+        var lg = load("trx:log", {}), rt = load("trx:rate:" + plan.key, 0), old = lg[plan.key];
+        if (!old || !(old.sec > secs)) {
+          lg[plan.key] = { type: plan.focus, sec: secs };
+          if (rt) lg[plan.key].r = rt;
+          save("trx:log", lg);
+        }
       }
     }
     persist(); render();
@@ -336,7 +364,9 @@
     var nx = s.kind === "rest" ? nextWork(st.idx) : S[st.idx + 1];
     if (nx && nx.kind === "rest") nx = nextWork(st.idx);
     var curName = s.kind === "rest" ? null : s.name;
-    $("next").textContent = !nx ? "Finish" : (nx.kind === "work" && (nx.name === curName || (s.kind === "rest" && nx.set > 1)) ? "Set " + nx.set : nx.name);
+    // Rest screens name the coming move (plus its set) so it reads from across the room; work screens stay short.
+    $("next").textContent = !nx ? "Finish" : s.kind === "rest" ? nx.name.replace(/-/g, "\u2011") + (nx.set > 1 ? " \u00b7 Set " + nx.set : "")
+      : (nx.kind === "work" && nx.name === curName ? "Set " + nx.set : nx.name);
     var stage = $("stage");
     stage.classList.toggle("rest", s.kind === "rest");
     stage.classList.toggle("paused", !running);
@@ -366,7 +396,9 @@
       var ms = st.startedAt && st.finishedAt ? st.finishedAt - st.startedAt : 0;
       $("finishTime").textContent = fmtElapsed(ms);
       var sk = streak();
-      $("finishStreak").textContent = sk.streak > 1 ? sk.streak + "-day streak" : "";
+      var short = ms < MIN_SEC * 1000;
+      $("finishStreak").textContent = short ? "Under 10 min \u00b7 not counted" : sk.streak > 1 ? sk.streak + "-day streak" : "";
+      $("rate").hidden = short;
       renderRate();
       if (wasHidden) renderTomorrow();
     } else fin.hidden = true;
@@ -542,7 +574,7 @@
   });
   window.addEventListener("pagehide", persist);
 
-  window.TRXAPP = { beep: beep, unlockAudio: unlockAudio, acquireWake: acquireWake, releaseWake: releaseWake, maybeReload: maybeReload };
+  window.TRXAPP = { flash: flash, beep: beep, unlockAudio: unlockAudio, acquireWake: acquireWake, releaseWake: releaseWake, maybeReload: maybeReload };
   initDay();
 
   if ("serviceWorker" in navigator) {
