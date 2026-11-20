@@ -48,6 +48,19 @@
     } catch (e) {}
   })();
 
+  // ---- One-time backfill: Wed 2026-11-18 (Push) counts. Runs after the 11/19 reset and the 10-min cleanup
+  // (both are flagged, so they never run again and can't remove it). Local only: no ping (the box has it).
+  (function backfill1118() {
+    var FLAG = "trx:backfill1118", K = "2026-11-18";
+    if (LS.getItem(FLAG)) return;
+    try {
+      var lg = load("trx:log", {}) || {};
+      if (!lg[K]) { lg[K] = { type: "Push", sec: 900 }; save("trx:log", lg); }
+      var hist = load("trx:history", []); if (hist.indexOf(K) === -1) { hist.push(K); hist.sort(); save("trx:history", hist); }
+      LS.setItem(FLAG, String(Date.now()));
+    } catch (e) {}
+  })();
+
   // ---- Completion ping (ntfy.sh): once per date, queued until a POST succeeds ----
   // The topic is never in the code: it lives only in this device's localStorage (trx:ntfyTopic), set when the phone was paired.
   var TOPIC_RE = /^[A-Za-z0-9_-]{16,64}$/;
