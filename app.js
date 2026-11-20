@@ -14,6 +14,44 @@
   function bansFor(k) { var b = load("trx:bans", {}) || {}; return Object.keys(b).filter(function (n) { return b[n] <= k; }); }
   function saveOv(k, ov) { save("trx:ov:" + k, ov); }
 
+  function commitBans(k, list) {
+    if (!list || !list.length) return;
+    var b = load("trx:bans", {}) || {};
+    list.forEach(function (n) { if (!b[n] || b[n] > k) b[n] = k; });
+    save("trx:bans", b);
+  }
+
+  // ---- Custom moves (trx:custom = { "legs:primary": [names], ..., "abs": [names] }) ----
+  // A placeholder is dropped once the shipped library has the same name in that category (case-insensitive).
+  (function loadCustom() {
+    var c = load("trx:custom", {}) || {}, out = {}, changed = false;
+    Object.keys(c).forEach(function (cat) {
+      var shipped = (T.catShipped(cat) || []).map(function (n) { return n.toLowerCase(); });
+      var list = (Array.isArray(c[cat]) ? c[cat] : []).filter(function (n) {
+        var ok = typeof n === "string" && n && shipped.indexOf(n.toLowerCase()) === -1; if (!ok) changed = true; return ok;
+      });
+      if (list.length) out[cat] = list; else changed = true;
+    });
+    if (changed) save("trx:custom", out);
+    T.setCustom(out);
+  })();
+  function cleanName(raw) {
+    var n = String(raw || "").replace(/\s+/g, " ").trim().slice(0, 40);
+    return n ? n.charAt(0).toUpperCase() + n.slice(1) : "";
+  }
+  // Adds a typed move to the slot's category; returns the name to select. Unknown moves ping the box.
+  function addCustom(k, slot, raw) {
+    var name = cleanName(raw); if (!name) return "";
+    var opts = T.slotOptions(k, slot), i = opts.map(function (n) { return n.toLowerCase(); }).indexOf(name.toLowerCase());
+    if (i !== -1) return opts[i];
+    var ship = T.shippedName(name), cat = T.catKey(k, slot), c = load("trx:custom", {}) || {};
+    name = ship || name;
+    (c[cat] = c[cat] || []).push(name); save("trx:custom", c); T.setCustom(c);
+    if (!ship) queueAdd({ name: name, slot: slot + 1, cat: cat });
+    return name;
+  }
+  function isPlaceholder(n) { return !!n && !T.shippedName(n) && !(window.HOWTO || {})[n]; }
+
   // ---- One-time fresh start: tracking begins 2026-11-19 ----
   // Runs on the first load on/after that date (so tonight's session is untouched): drops every on-device
   // record dated before it (log, history/streak, done/closed/rating/progress, old swaps, unsent pings).
@@ -72,7 +110,7 @@
   // is replaced. trx:pinged:DATE now records the longest seconds sent.
   function queuePing(dateKey, body) {
     var q = load("trx:pingq", []);
-    q = q.filter(function (b, i) { if (flushing && i === 0) return true; try { var j = JSON.parse(b); return !(j.d === dateKey && !/rate$/.test(j.t)); } catch (e) { return true; } });
+    q = q.filter(function (b, i) { if (flushing && i === 0) return true; try { var j = JSON.parse(b); return !(j.d === dateKey && !/(rate|add)$/.test(j.t)); } catch (e) { return true; } });
     q.push(body); save("trx:pingq", q);
     try { var sec = JSON.parse(body).sec || 0, prev = load("trx:pinged:" + dateKey, 0); save("trx:pinged:" + dateKey, Math.max(sec, +prev || 0)); } catch (e) {}
     flushPings();
@@ -102,6 +140,12 @@
     q.push(JSON.stringify({ t: tag, d: dateKey, r: r })); save("trx:pingq", q);
     var lg = load("trx:log", {}); if (lg[dateKey]) { lg[dateKey].r = r; save("trx:log", lg); }
     flushPings();
+  }
+  // New-move request for the box to research: {t:"add", name, slot, cat} ("test-add" in tests, ignored by the box).
+  function queueAdd(o) {
+    var pre = load("trx:pingPrefix", ""), q = load("trx:pingq", []);
+    q.push(JSON.stringify({ t: pre ? pre + "-add" : "add", d: todayKey, name: o.name, slot: o.slot, cat: o.cat }));
+    save("trx:pingq", q); flushPings();
   }
   window.addEventListener("online", flushPings);
   setTimeout(flushPings, 1500);
@@ -294,40 +338,41 @@
   }
   function tomorrowKey() { var d = T.parseKey(todayKey); d.setDate(d.getDate() + 1); return T.dateKey(d); }
   // Swaps stay pending until Save.
-  var pendingOv = null;
+  var pendingOv = null, pendingBans = [];
   function ovEqual(a, b) { return JSON.stringify(a || {}) === JSON.stringify(b || {}); }
   function renderSave(justSaved) {
-    var b = $("saveBtn"), dirty = pendingOv && !ovEqual(pendingOv, loadOv(tomorrowKey()));
-    if (justSaved) { b.hidden = false; b.textContent = "Saved \u2713"; b.classList.add("saved"); setTimeout(function () { if (!pendingOv || ovEqual(pendingOv, loadOv(tomorrowKey()))) b.hidden = true; }, 1600); return; }
+    var b = $("saveBtn"), dirty = (pendingOv && !ovEqual(pendingOv, loadOv(tomorrowKey()))) || pendingBans.length > 0;
+    if (justSaved) { b.hidden = false; b.textContent = "Saved \u2713"; b.classList.add("saved"); setTimeout(function () { if ((!pendingOv || ovEqual(pendingOv, loadOv(tomorrowKey()))) && !pendingBans.length) b.hidden = true; }, 1600); return; }
     b.textContent = "Save"; b.classList.remove("saved"); b.hidden = !dirty;
+  }
+  function finBans() { return bansFor(tomorrowKey()).concat(pendingBans); }
+  var finCtx = {
+    ov: function () { return pendingOv; }, bans: finBans,
+    set: function (slot, n) { pendingOv[slot] = n; },
+    ban: function (n) { if (pendingBans.indexOf(n) === -1) pendingBans.push(n); Object.keys(pendingOv).forEach(function (s) { if (pendingOv[s] === n) delete pendingOv[s]; }); },
+    unban: function (n) { pendingBans = pendingBans.filter(function (x) { return x !== n; }); },
+    done: function () { renderTomorrow(); }
+  };
+  function planRow(name, slot, cls, ctx, guard) {
+    var li = document.createElement("li");
+    var nb = document.createElement("button"); nb.type = "button"; nb.className = cls; nb.textContent = name.replace(/-/g, "\u2011");
+    nb.setAttribute("aria-label", "Change " + name);
+    nb.addEventListener("click", function () { if (!guard || Date.now() - lastSwipe > 400) openPick(ctx, slot); });
+    var qb = document.createElement("button"); qb.type = "button"; qb.className = "qBtn"; qb.textContent = "?";
+    qb.setAttribute("aria-label", "How to do " + name);
+    qb.addEventListener("click", function () { openHowto(name); });
+    li.appendChild(nb); li.appendChild(qb); return li;
   }
   function renderTomorrow() {
     var k = tomorrowKey();
     if (!pendingOv) pendingOv = JSON.parse(JSON.stringify(loadOv(k) || {}));
-    var tp = T.planFor(k, pendingOv, bansFor(k));
+    var tp = T.planFor(k, pendingOv, finBans());
     $("tmrHead").textContent = "Tomorrow \u00b7 " + tp.focus;
     var ol = $("tmrList"); ol.innerHTML = "";
-    tp.moves.forEach(function (name, slot) {
-      var li = document.createElement("li");
-      var nb = document.createElement("button"); nb.type = "button"; nb.className = "tmrName"; nb.textContent = name;
-      nb.addEventListener("click", function () { if (Date.now() - lastSwipe > 400) openHowto(name); });
-      var sb = document.createElement("button"); sb.type = "button"; sb.className = "tmrSwap"; sb.textContent = "\u21bb";
-      sb.setAttribute("aria-label", "Swap " + name);
-      sb.addEventListener("click", function () { swapTomorrow(slot); });
-      li.appendChild(nb); li.appendChild(sb); ol.appendChild(li);
-    });
+    tp.moves.forEach(function (name, slot) { ol.appendChild(planRow(name, slot, "tmrName", finCtx, true)); });
     renderSave();
   }
-  function swapTomorrow(slot) {
-    var k = tomorrowKey(); if (!pendingOv) pendingOv = JSON.parse(JSON.stringify(loadOv(k) || {}));
-    var tp = T.planFor(k, pendingOv, bansFor(k));
-    var opts = T.swapOptions(k, slot, tp.moves, bansFor(k));
-    if (!opts.length) return;
-    pendingOv[slot] = opts[Math.floor(Math.random() * opts.length)];
-    renderTomorrow();
-    var b = $("tmrList").children[slot].querySelector(".tmrSwap"); b.classList.add("spin");
-  }
-  function saveTomorrow() { saveOv(tomorrowKey(), JSON.parse(JSON.stringify(pendingOv || {}))); renderSave(true); }
+  function saveTomorrow() { var k = tomorrowKey(); commitBans(k, pendingBans); pendingBans = []; saveOv(k, JSON.parse(JSON.stringify(pendingOv || {}))); renderSave(true); }
   function fmtDate(k) { return T.parseKey(k).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }); }
   function nonRest() { var a = []; S.forEach(function (s, i) { if (s.kind !== "rest") a.push(i); }); return a; }
 
@@ -443,7 +488,9 @@
   function openHowto(forName) {
     var s = typeof forName === "string" ? { name: forName, cue: "" } : infoStep(), h = (window.HOWTO || {})[s.name];
     $("hName").textContent = s.name;
-    $("hSetup").textContent = h ? h.setup : s.cue;
+    var ph = !h && isPlaceholder(s.name);
+    $("hSetup").textContent = h ? h.setup : ph ? "Coach is writing this up." : s.cue;
+    [].forEach.call($("howto").querySelectorAll(".hRow"), function (r) { r.hidden = !h; });
     var ol = $("hSteps"); ol.innerHTML = "";
     (h ? h.steps : []).forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ol.appendChild(li); });
     $("hAvoid").textContent = h ? h.avoid : "";
@@ -460,7 +507,7 @@
   $("name").addEventListener("keydown", function (e) { if (e.key === "Enter") openHowto(); });
   $("hClose").addEventListener("click", closeHowto);
   $("howto").addEventListener("click", function (e) { if (e.target === $("howto")) closeHowto(); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeHowto(); });
+  document.addEventListener("keydown", function (e) { if (e.key !== "Escape") return; if (!$("howto").hidden) closeHowto(); else if (!$("pick").hidden) closePick(); });
 
   // ---- Name auto-fit: as large as possible, max 2 lines ----
   function fitName() {
@@ -552,63 +599,96 @@
   $("saveBtn").addEventListener("click", saveTomorrow);
   // Finished: auto-save pending swaps, close the day, go Home until tomorrow.
   $("finishedBtn").addEventListener("click", function () {
+    commitBans(tomorrowKey(), pendingBans); pendingBans = [];
     if (pendingOv && !ovEqual(pendingOv, loadOv(tomorrowKey()))) saveOv(tomorrowKey(), JSON.parse(JSON.stringify(pendingOv)));
     save("trx:closed:" + plan.key, true); render();
   });
   // ---- Edit tomorrow (from Home): ↻ shuffles a slot, hold × drops a move for good; Save keeps both ----
   var editOv = null, editBans = [];
   function editBansAll() { return bansFor(tomorrowKey()).concat(editBans); }
-  function renderEdit(spinSlot) {
+  var editCtx = {
+    ov: function () { return editOv; }, bans: editBansAll,
+    set: function (slot, n) { editOv[slot] = n; },
+    ban: function (n) { if (editBans.indexOf(n) === -1) editBans.push(n); Object.keys(editOv).forEach(function (s) { if (editOv[s] === n) delete editOv[s]; }); },
+    unban: function (n) { editBans = editBans.filter(function (x) { return x !== n; }); },
+    done: function () { renderEdit(); }
+  };
+  function renderEdit() {
     var k = tomorrowKey(), tp = T.planFor(k, editOv, editBansAll());
     $("eTitle").textContent = "Tomorrow \u00b7 " + tp.focus;
     var ol = $("eList"); ol.innerHTML = "";
-    tp.moves.forEach(function (name, slot) {
-      var li = document.createElement("li");
-      var nb = document.createElement("button"); nb.type = "button"; nb.className = "eName"; nb.textContent = name.replace(/-/g, "\u2011");
-      nb.addEventListener("click", function () { openHowto(name); });
+    tp.moves.forEach(function (name, slot) { ol.appendChild(planRow(name, slot, "eName", editCtx, false)); });
+  }
+
+  // ---- Pick list: every option in the slot's category (minus bans and moves used elsewhere that day) ----
+  var pk = null, SLOT_NAMES = ["Primary", "Secondary", "Accessory", "Accessory", "Abs"];
+  function pickHint(t, warn) { var h = $("pHint"); h.textContent = t; h.classList.toggle("warn", !!warn); }
+  function openPick(ctx, slot) {
+    pk = { ctx: ctx, slot: slot };
+    pickHint("Tap to pick \u00b7 hold \u00d7 to drop for good");
+    renderPick(); $("pick").hidden = false;
+    var cur = $("pList").querySelector(".cur"); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "center" });
+  }
+  function closePick() { $("pick").hidden = true; if (pk) { var c = pk.ctx; pk = null; c.done(); } }
+  function renderPick() {
+    var k = tomorrowKey(), c = pk.ctx, bans = c.bans(), tp = T.planFor(k, c.ov(), bans), cur = tp.moves[pk.slot];
+    $("pTitle").textContent = (pk.slot + 1) + " \u00b7 " + SLOT_NAMES[pk.slot];
+    var opts = T.slotOptions(k, pk.slot).filter(function (n) { return n === cur || (bans.indexOf(n) === -1 && tp.moves.indexOf(n) === -1); });
+    var ol = $("pList"); ol.innerHTML = "";
+    opts.forEach(function (name) {
+      var li = document.createElement("li"); if (name === cur) li.className = "cur";
+      var nb = document.createElement("button"); nb.type = "button"; nb.className = "pName"; nb.textContent = name.replace(/-/g, "\u2011");
+      if (name === cur) nb.setAttribute("aria-current", "true");
+      nb.addEventListener("click", function () { c.set(pk.slot, name); closePick(); });
+      var qb = document.createElement("button"); qb.type = "button"; qb.className = "qBtn"; qb.textContent = "?";
+      qb.setAttribute("aria-label", "How to do " + name);
+      qb.addEventListener("click", function () { openHowto(name); });
       var xb = document.createElement("button"); xb.type = "button"; xb.className = "eBan"; xb.innerHTML = "<span>\u00d7</span>";
       xb.setAttribute("aria-label", "Hold to drop " + name + " for good");
-      holdToBan(xb, slot, name);
-      var sb = document.createElement("button"); sb.type = "button"; sb.className = "eSwap" + (slot === spinSlot ? " spin" : ""); sb.textContent = "\u21bb";
-      sb.setAttribute("aria-label", "Shuffle " + name);
-      sb.addEventListener("click", function () { shuffleEdit(slot); });
-      li.appendChild(nb); li.appendChild(xb); li.appendChild(sb); ol.appendChild(li);
+      holdToBan(xb, name, function () { c.ban(name); renderPick(); pickHint(name + " won't come up again", true); });
+      li.appendChild(nb); li.appendChild(qb); li.appendChild(xb); ol.appendChild(li);
     });
+    var nl = document.createElement("li"); nl.className = "pNewRow";
+    var add = document.createElement("button"); add.type = "button"; add.className = "pName pNew"; add.textContent = "+ New";
+    add.addEventListener("click", function () {
+      nl.innerHTML = "";
+      var f = document.createElement("form"); f.className = "pForm";
+      var inp = document.createElement("input"); inp.type = "text"; inp.className = "pInput"; inp.maxLength = 40; inp.placeholder = "Move name";
+      inp.setAttribute("autocapitalize", "sentences"); inp.setAttribute("enterkeyhint", "done"); inp.setAttribute("aria-label", "New move name");
+      var go = document.createElement("button"); go.type = "submit"; go.className = "pAdd"; go.textContent = "Add";
+      f.appendChild(inp); f.appendChild(go); nl.appendChild(f);
+      f.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var n = addCustom(k, pk.slot, inp.value); if (!n) { inp.focus(); return; }
+        c.unban(n);
+        var b = load("trx:bans", {}) || {}; if (b[n]) { delete b[n]; save("trx:bans", b); }
+        var now = T.planFor(k, c.ov(), c.bans()).moves;
+        if (now.indexOf(n) !== -1 && now[pk.slot] !== n) { renderPick(); pickHint(n + " is already in tomorrow", true); return; }
+        c.set(pk.slot, n); closePick();
+      });
+      inp.focus();
+    });
+    nl.appendChild(add); ol.appendChild(nl);
   }
-  function shuffleEdit(slot) {
-    var k = tomorrowKey(), tp = T.planFor(k, editOv, editBansAll());
-    var opts = T.swapOptions(k, slot, tp.moves, editBansAll());
-    if (!opts.length) return;
-    editOv[slot] = opts[Math.floor(Math.random() * opts.length)];
-    renderEdit(slot);
-  }
-  function banEdit(slot, name) {
-    if (editBans.indexOf(name) === -1) editBans.push(name);
-    if (editOv[slot] === name) delete editOv[slot];
-    Object.keys(editOv).forEach(function (s) { if (editOv[s] === name) delete editOv[s]; });
-    var h = $("eHint"); h.textContent = name + " won't come up again"; h.classList.add("warn");
-    renderEdit(slot);
-  }
-  function holdToBan(el, slot, name) {
+  function holdToBan(el, name, onBan) {
     var t = null;
     function cancel() { if (t) { clearTimeout(t); t = null; } el.classList.remove("holding"); }
-    el.addEventListener("pointerdown", function (e) { e.preventDefault(); cancel(); el.classList.add("holding"); t = setTimeout(function () { t = null; banEdit(slot, name); }, 700); });
-    el.addEventListener("pointerup", function () { if (t) { var h = $("eHint"); h.textContent = "Hold \u00d7 to drop " + name; h.classList.add("warn"); } cancel(); });
+    el.addEventListener("pointerdown", function (e) { e.preventDefault(); cancel(); el.classList.add("holding"); t = setTimeout(function () { t = null; el.classList.remove("holding"); onBan(); }, 700); });
+    el.addEventListener("pointerup", function () { if (t) pickHint("Hold \u00d7 to drop " + name, true); cancel(); });
     el.addEventListener("pointerleave", cancel); el.addEventListener("pointercancel", cancel);
     el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
+  $("pClose").addEventListener("click", closePick);
   function openEdit() {
     editOv = JSON.parse(JSON.stringify(loadOv(tomorrowKey()) || {})); editBans = [];
-    var h = $("eHint"); h.innerHTML = "&#8635; shuffle &middot; hold &times; to drop a move for good"; h.classList.remove("warn");
-    renderEdit(-1); $("edit").hidden = false;
+    renderEdit(); $("edit").hidden = false;
   }
   function closeEdit() { $("edit").hidden = true; editOv = null; editBans = []; render(); }
   $("editBtn").addEventListener("click", openEdit);
   $("eClose").addEventListener("click", closeEdit);
   $("eSave").addEventListener("click", function () {
-    var k = tomorrowKey(), b = load("trx:bans", {}) || {};
-    editBans.forEach(function (n) { if (!b[n] || b[n] > k) b[n] = k; });
-    save("trx:bans", b);
+    var k = tomorrowKey();
+    commitBans(k, editBans);
     saveOv(k, JSON.parse(JSON.stringify(editOv || {})));
     pendingOv = null; closeEdit();
   });

@@ -104,9 +104,15 @@
   <div class="tTop"><button id="eClose" class="tIcon" type="button" aria-label="Back without saving">&times;</button><span id="eTitle" class="tTitle">Tomorrow</span><span class="tIconSpacer"></span></div>
   <div class="eBody">
     <ol id="eList" class="eList"></ol>
-    <p id="eHint" class="eHint">&#8635; shuffle &middot; hold &times; to drop a move for good</p>
+    <p id="eHint" class="eHint">Tap a move to change it</p>
   </div>
   <button id="eSave" class="tGo" type="button">Save</button>
+</section>
+
+<section id="pick" class="pick" hidden>
+  <div class="tTop"><button id="pClose" class="tIcon" type="button" aria-label="Back">&times;</button><span id="pTitle" class="tTitle">Pick</span><span class="tIconSpacer"></span></div>
+  <p id="pHint" class="eHint pHint"></p>
+  <ol id="pList" class="eList pList"></ol>
 </section>
 
 <section id="finish" class="finish" hidden>

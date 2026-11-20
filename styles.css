@@ -75,8 +75,6 @@ body {
 .tmrList { list-style: none; margin: 0; padding: 0; border-top: 1px solid #2a2a2a; }
 .tmrList li { display: flex; align-items: center; border-bottom: 1px solid #2a2a2a; min-height: 52px; }
 .tmrName { flex: 1; background: none; border: 0; color: var(--fg); font: inherit; font-size: clamp(18px, 5.4vw, 22px); font-weight: 700; text-align: left; padding: 8px 0; cursor: pointer; }
-.tmrSwap { flex: 0 0 auto; width: 48px; height: 48px; background: none; border: 0; color: var(--fg); font-size: 26px; line-height: 1; cursor: pointer; padding: 0; touch-action: manipulation; }
-.tmrSwap.spin { animation: spin .35s ease-out; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #nosleep { position: fixed; width: 1px; height: 1px; opacity: 0.01; left: -10px; bottom: 0; pointer-events: none; }
 @media (max-height: 700px) { .chip { min-height: 64px; } .chip .n { font-size: 21px; } }
@@ -186,8 +184,9 @@ body {
 @keyframes flash2 { 0% { opacity: 1; } 25% { opacity: 0; } 50% { opacity: 1; } 75% { opacity: 0; } 100% { opacity: 0; } }
 
 /* Home: Edit tomorrow / Redo today */
-.hActs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-.hAct { min-height: 52px; border: 2px solid #5a5a5a; border-radius: 16px; background: var(--bg); color: var(--fg); font: inherit; font-size: clamp(16px, 4.6vw, 19px); font-weight: 800; cursor: pointer; touch-action: manipulation; }
+.hActs { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+.hAct { min-height: 40px; padding: 0 14px; border: 0; background: none; color: #a8a8a8; font: inherit; font-size: 15px; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: #555; cursor: pointer; touch-action: manipulation; }
+.hAct:active { color: var(--fg); }
 
 /* Edit tomorrow */
 .edit { position: fixed; inset: 0; z-index: 15; background: var(--bg); color: var(--fg); display: flex; flex-direction: column;
@@ -197,14 +196,26 @@ body {
 .eList { list-style: none; margin: 0; padding: 0; border-top: 1px solid #2a2a2a; }
 .eList li { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #2a2a2a; min-height: 64px; }
 .eName { flex: 1; min-width: 0; background: none; border: 0; color: var(--fg); font: inherit; font-size: clamp(19px, 5.8vw, 24px); font-weight: 800; text-align: left; padding: 10px 0; cursor: pointer; }
-.eBan, .eSwap { flex: 0 0 auto; width: 48px; height: 48px; border-radius: 50%; background: var(--bg); color: var(--fg); font: inherit; line-height: 1; padding: 0; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.eBan { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; background: var(--bg); color: var(--fg); font: inherit; line-height: 1; padding: 0; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .eBan { position: relative; overflow: hidden; border: 2px solid #4a4a4a; color: #9a9a9a; font-size: 24px; }
 .eBan::before { content: ""; position: absolute; inset: 0; background: var(--fg); transform: scaleY(0); transform-origin: bottom; transition: transform .1s; }
 .eBan span { position: relative; mix-blend-mode: difference; color: #fff; }
 .eBan.holding { border-color: var(--fg); }
 .eBan.holding::before { transform: scaleY(1); transition: transform .7s linear; }
-.eSwap { border: 2px solid var(--fg); font-size: 26px; touch-action: manipulation; }
-.eSwap.spin { animation: spin .35s ease-out; }
 .eHint { margin: 16px 0 0; text-align: center; font-size: 14px; font-weight: 700; color: var(--dim); min-height: 1.3em; }
 .eHint.warn { color: var(--fg); }
-@media (max-height: 700px) { .eList li { min-height: 56px; } .hAct { min-height: 46px; } }
+@media (max-height: 700px) { .eList li { min-height: 56px; } }
+.qBtn { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #4a4a4a; background: var(--bg); color: #9a9a9a; font: inherit; font-size: 18px; font-weight: 800; line-height: 1; padding: 0; cursor: pointer; touch-action: manipulation; }
+.pick { position: fixed; inset: 0; z-index: 18; background: var(--bg); color: var(--fg); display: flex; flex-direction: column;
+  padding: max(10px, env(safe-area-inset-top)) 18px max(14px, env(safe-area-inset-bottom)); }
+.pick[hidden] { display: none; }
+.pHint { margin: 4px 0 10px; }
+.pList { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.pList li { gap: 8px; min-height: 60px; }
+.pName { flex: 1; min-width: 0; background: none; border: 0; color: var(--fg); font: inherit; font-size: clamp(19px, 5.6vw, 23px); font-weight: 700; text-align: left; padding: 12px 10px; cursor: pointer; border-radius: 12px; }
+.pList li.cur .pName { background: var(--fg); color: var(--bg); font-weight: 900; }
+.pNew { color: #a8a8a8; }
+.pForm { flex: 1; display: flex; gap: 8px; padding: 8px 0; }
+.pInput { flex: 1; min-width: 0; height: 48px; border: 2px solid var(--fg); border-radius: 12px; background: var(--bg); color: var(--fg); font: inherit; font-size: 19px; font-weight: 700; padding: 0 12px; outline: none; }
+.pAdd { flex: 0 0 auto; height: 48px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--fg); color: var(--bg); font: inherit; font-size: 18px; font-weight: 800; cursor: pointer; }
+.tmrList li { gap: 8px; }
