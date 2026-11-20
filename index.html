@@ -93,8 +93,20 @@
       <button class="hTimer" type="button" data-t="sw">Stopwatch</button>
       <button class="hTimer" type="button" data-t="intv">Intervals</button>
     </div>
-    <button id="redoBtn" class="redo" type="button">Redo today</button>
+    <div class="hActs">
+      <button id="editBtn" class="hAct" type="button">Edit tomorrow</button>
+      <button id="redoBtn" class="hAct" type="button">Redo today</button>
+    </div>
   </div>
+</section>
+
+<section id="edit" class="edit" hidden>
+  <div class="tTop"><button id="eClose" class="tIcon" type="button" aria-label="Back without saving">&times;</button><span id="eTitle" class="tTitle">Tomorrow</span><span class="tIconSpacer"></span></div>
+  <div class="eBody">
+    <ol id="eList" class="eList"></ol>
+    <p id="eHint" class="eHint">&#8635; shuffle &middot; hold &times; to drop a move for good</p>
+  </div>
+  <button id="eSave" class="tGo" type="button">Save</button>
 </section>
 
 <section id="finish" class="finish" hidden>

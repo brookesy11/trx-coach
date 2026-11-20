@@ -154,22 +154,30 @@
   function isAbs(name) { return ABS.some(function (a) { return a[0] === name; }); }
 
   // Swap candidates for one slot (0-3 main, 4 abs): same day-type pool (or abs pool), no duplicates within the day.
-  function swapOptions(key, slot, currentMoves) {
+  // bans: optional list of move names the user never wants picked (they still apply if every option is banned).
+  function swapOptions(key, slot, currentMoves, bans) {
     var pool = slot === 4 ? ABS.map(function (a) { return a[0]; }) : dayPool(dayInfo(key).type);
-    return pool.filter(function (n) { return currentMoves.indexOf(n) === -1; });
+    var out = pool.filter(function (n) { return currentMoves.indexOf(n) === -1; });
+    var ok = out.filter(function (n) { return !(bans && bans.indexOf(n) !== -1); });
+    return ok.length ? ok : out;
   }
 
   // overrides: optional { slotIndex: moveName } (user swaps), applied after the normal pick.
-  function planFor(key, overrides) {
+  function planFor(key, overrides, bans) {
     var info = dayInfo(key), day = DAYS[info.type];
     var r = rng(hash("trx2:" + day.key + ":" + info.cycle)), used = {};
+    var banned = {}; (bans || []).forEach(function (n) { banned[n] = true; });
+    function allowed(slot) { var s = slot.filter(function (x) { return !banned[x[1]]; }); return s.length ? s : slot; }
     // Even cycles use the staple (most proven) move in each slot; odd cycles draw by weight for variety.
     var staple = mod(info.cycle, 2) === 0;
     var moves = day.slots.map(function (slot) {
+      slot = allowed(slot);
       if (staple) { var o = slot.filter(function (x) { return !used[x[1]]; })[0] || slot[0]; used[o[1]] = true; return { name: o[1], cue: o[2] }; }
       return pickWeighted(slot, r, used);
     });
-    var ab = ABS[mod(info.n, ABS.length)];
+    var ai = mod(info.n, ABS.length);
+    for (var t = 0; t < ABS.length && banned[ABS[ai][0]]; t++) ai = mod(ai + 1, ABS.length); // skip banned abs moves
+    var ab = ABS[ai];
     moves.push({ name: ab[0], cue: ab[1], abs: true });
     if (overrides) {
       var dayNames = dayPool(info.type);

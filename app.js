@@ -10,6 +10,8 @@
 
   // ---- User swaps, per date: trx:ov:YYYY-MM-DD = { slot: name } ----
   function loadOv(k) { return load("trx:ov:" + k, null); }
+  // Banned moves: { name: firstDateItAppliesTo }. A ban made today starts tomorrow, so today's plan never changes.
+  function bansFor(k) { var b = load("trx:bans", {}) || {}; return Object.keys(b).filter(function (n) { return b[n] <= k; }); }
   function saveOv(k, ov) { save("trx:ov:" + k, ov); }
 
   // ---- One-time fresh start: tracking begins 2026-11-19 ----
@@ -113,7 +115,7 @@
   function initDay() {
     freshStart(); // also covers an app left open across midnight into 2026-11-19
     todayKey = T.dateKey(new Date());
-    plan = T.planFor(todayKey, loadOv(todayKey));
+    plan = T.planFor(todayKey, loadOv(todayKey), bansFor(todayKey));
     S = plan.steps;
     var saved = load("trx:day", null);
     if (saved && saved.key === plan.key && saved.sig === plan.sig && saved.done && saved.done.length === S.length) st = saved;
@@ -302,7 +304,7 @@
   function renderTomorrow() {
     var k = tomorrowKey();
     if (!pendingOv) pendingOv = JSON.parse(JSON.stringify(loadOv(k) || {}));
-    var tp = T.planFor(k, pendingOv);
+    var tp = T.planFor(k, pendingOv, bansFor(k));
     $("tmrHead").textContent = "Tomorrow \u00b7 " + tp.focus;
     var ol = $("tmrList"); ol.innerHTML = "";
     tp.moves.forEach(function (name, slot) {
@@ -318,8 +320,8 @@
   }
   function swapTomorrow(slot) {
     var k = tomorrowKey(); if (!pendingOv) pendingOv = JSON.parse(JSON.stringify(loadOv(k) || {}));
-    var tp = T.planFor(k, pendingOv);
-    var opts = T.swapOptions(k, slot, tp.moves);
+    var tp = T.planFor(k, pendingOv, bansFor(k));
+    var opts = T.swapOptions(k, slot, tp.moves, bansFor(k));
     if (!opts.length) return;
     pendingOv[slot] = opts[Math.floor(Math.random() * opts.length)];
     renderTomorrow();
@@ -359,7 +361,7 @@
     var yh = "";
     for (var mi = 0; mi < 12; mi++) { var days = new Date(y, mi + 1, 0).getDate(); yh += '<i><b style="width:' + Math.min(100, perMonth[mi] / days * 100).toFixed(1) + '%"></b></i>'; }
     $("yearRow").innerHTML = yh;
-    var tp = T.planFor(tomorrowKey(), loadOv(tomorrowKey()));
+    var tp = T.planFor(tomorrowKey(), loadOv(tomorrowKey()), bansFor(tomorrowKey()));
     $("hNext").textContent = "Tomorrow \u00b7 " + tp.focus;
   }
 
@@ -553,6 +555,64 @@
     if (pendingOv && !ovEqual(pendingOv, loadOv(tomorrowKey()))) saveOv(tomorrowKey(), JSON.parse(JSON.stringify(pendingOv)));
     save("trx:closed:" + plan.key, true); render();
   });
+  // ---- Edit tomorrow (from Home): ↻ shuffles a slot, hold × drops a move for good; Save keeps both ----
+  var editOv = null, editBans = [];
+  function editBansAll() { return bansFor(tomorrowKey()).concat(editBans); }
+  function renderEdit(spinSlot) {
+    var k = tomorrowKey(), tp = T.planFor(k, editOv, editBansAll());
+    $("eTitle").textContent = "Tomorrow \u00b7 " + tp.focus;
+    var ol = $("eList"); ol.innerHTML = "";
+    tp.moves.forEach(function (name, slot) {
+      var li = document.createElement("li");
+      var nb = document.createElement("button"); nb.type = "button"; nb.className = "eName"; nb.textContent = name.replace(/-/g, "\u2011");
+      nb.addEventListener("click", function () { openHowto(name); });
+      var xb = document.createElement("button"); xb.type = "button"; xb.className = "eBan"; xb.innerHTML = "<span>\u00d7</span>";
+      xb.setAttribute("aria-label", "Hold to drop " + name + " for good");
+      holdToBan(xb, slot, name);
+      var sb = document.createElement("button"); sb.type = "button"; sb.className = "eSwap" + (slot === spinSlot ? " spin" : ""); sb.textContent = "\u21bb";
+      sb.setAttribute("aria-label", "Shuffle " + name);
+      sb.addEventListener("click", function () { shuffleEdit(slot); });
+      li.appendChild(nb); li.appendChild(xb); li.appendChild(sb); ol.appendChild(li);
+    });
+  }
+  function shuffleEdit(slot) {
+    var k = tomorrowKey(), tp = T.planFor(k, editOv, editBansAll());
+    var opts = T.swapOptions(k, slot, tp.moves, editBansAll());
+    if (!opts.length) return;
+    editOv[slot] = opts[Math.floor(Math.random() * opts.length)];
+    renderEdit(slot);
+  }
+  function banEdit(slot, name) {
+    if (editBans.indexOf(name) === -1) editBans.push(name);
+    if (editOv[slot] === name) delete editOv[slot];
+    Object.keys(editOv).forEach(function (s) { if (editOv[s] === name) delete editOv[s]; });
+    var h = $("eHint"); h.textContent = name + " won't come up again"; h.classList.add("warn");
+    renderEdit(slot);
+  }
+  function holdToBan(el, slot, name) {
+    var t = null;
+    function cancel() { if (t) { clearTimeout(t); t = null; } el.classList.remove("holding"); }
+    el.addEventListener("pointerdown", function (e) { e.preventDefault(); cancel(); el.classList.add("holding"); t = setTimeout(function () { t = null; banEdit(slot, name); }, 700); });
+    el.addEventListener("pointerup", function () { if (t) { var h = $("eHint"); h.textContent = "Hold \u00d7 to drop " + name; h.classList.add("warn"); } cancel(); });
+    el.addEventListener("pointerleave", cancel); el.addEventListener("pointercancel", cancel);
+    el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+  function openEdit() {
+    editOv = JSON.parse(JSON.stringify(loadOv(tomorrowKey()) || {})); editBans = [];
+    var h = $("eHint"); h.innerHTML = "&#8635; shuffle &middot; hold &times; to drop a move for good"; h.classList.remove("warn");
+    renderEdit(-1); $("edit").hidden = false;
+  }
+  function closeEdit() { $("edit").hidden = true; editOv = null; editBans = []; render(); }
+  $("editBtn").addEventListener("click", openEdit);
+  $("eClose").addEventListener("click", closeEdit);
+  $("eSave").addEventListener("click", function () {
+    var k = tomorrowKey(), b = load("trx:bans", {}) || {};
+    editBans.forEach(function (n) { if (!b[n] || b[n] > k) b[n] = k; });
+    save("trx:bans", b);
+    saveOv(k, JSON.parse(JSON.stringify(editOv || {})));
+    pendingOv = null; closeEdit();
+  });
+
   $("redoBtn").addEventListener("click", function () {
     try { localStorage.removeItem("trx:closed:" + plan.key); } catch (e) {}
     pendingOv = null; reset();
